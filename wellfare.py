@@ -1,34 +1,62 @@
-from molecule import Molecule
-from qmparser import extractMolecularData
+#####################
+#                   #
+# Import statements #
+#                   #
+#####################
 
-################################################################################
-#                                                                              #
-# This is the part of the program where the command line arguments are defined #
-#                                                                              #
-################################################################################
+import time
+import argparse
+from multiprocessing import Pool, cpu_count
+
+from atom import Atom
+from molecule import Molecule
+from qmparser import extract_molecular_data
+from messages import *
+
+########################################################
+#                                                      #
+# This is where the command line arguments are defined #
+#                                                      #
+########################################################
 
 parser = argparse.ArgumentParser(
-    description="WellFAReFF: Method for the Incremental Construction and Exploration of the Potential Energy Surface",
+    description="WellFARe: Method for the Incremental Construction and Exploration of the Potential Energy Surface",
     epilog="recognised filetypes: gaussian, orca, turbomole, xyz")
-# parser.add_argument("-P", "--numproc", type=int, help="number of processes for parallel execution",
-#                     default="2")
-parser.add_argument("-v", "--verbosity", help="increase output verbosity", type=int, choices=[0, 1, 2, 3], default=0)
-parser.add_argument("-o", "--output",
-                    help="type of output file to be written: xyz file or just cartesian coordinates without header",
-                    choices=["xyz", "cart"],
-                    default="cart")
-parser.add_argument("-g", "--group", help="replacement group", choices=["methyl", "ethenyl", "oh", "oh2", "nh2", "nh3", "cho", "f", "cl", "br", "i"], default="methyl")
+parser.add_argument("-P", "--numproc", type=int,
+                    help="number of processes for parallel execution",
+                    default="0")
+parser.add_argument("-v", "--verbosity", help="increase output verbosity",
+                    type=int, choices=[0, 1, 2, 3], default=3)
 parser.add_argument("inputfile", metavar='file',
                     help="input file(s) with molecular structure")
-parser.add_argument("-r", "--replace", type=int, nargs='+', help="list of individual hydrogen atoms to replace")
-parser.add_argument("-a", "--alloncarbon", type=int, nargs='+',
-                    help="list of carbon atoms whose hydrogen atoms should be replaced")
-parser.add_argument("-t", "--terminal", type=int, help="number of terminal hydrogen atoms to replace")
 
 args = parser.parse_args()
 
+# Default number of cores for processing is requested with "-p 0" and uses
+# all available cores.
+if args.numproc == 0:
+    args.numproc = cpu_count()
+
+
+############################################
+#                                          #
+# The main part of the program starts here #
+#                                          #
+############################################
+
 def main():
-    pass
+    prg_start_time = time.time()
+
+    # Print GPL v3 statement and program header
+    if args.verbosity >= 1:
+        msg_program_header("WellFARe", 0.9)
+
+    molecule = Molecule("Input Structure", 0)
+    extract_molecular_data(args.inputfile, molecule, verbosity=args.verbosity)
+
+    # Print program footer
+    if args.verbosity >= 1:
+        msg_program_footer(prg_start_time)
 
 if __name__ == '__main__':
     main()

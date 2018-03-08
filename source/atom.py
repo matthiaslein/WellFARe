@@ -58,7 +58,7 @@ class Atom:
             self.charge = SymbolToNumber[sym]
 
         if mass is None:
-            self.mass = SymbolToMass[sym]
+            self.mass = SymbolToMass[self.symbol()]
         else:
             self.mass = mass
 
@@ -71,7 +71,7 @@ class Atom:
                  format: (MASS)SYMBOL, (X, Y, Z)
         """
 
-        return '({: .3f}){}: ({: .8f}, {: .8f}, {: .8f}))'.format(self.mass,
+        return '({: 8.3f}){}: ({: 13.8f}, {: 13.8f}, {: 13.8f}))'.format(self.mass,
                                                              self.symbol(),
                                                              self.coord[0],
                                                              self.coord[1],
@@ -84,7 +84,7 @@ class Atom:
                  format: (MASS)SYMBOL, (X, Y, Z)
         """
 
-        return '({: .3f}){}: ({: .8f}, {: .8f}, {: .8f}))'.format(self.mass,
+        return '({: 8.3f}){}: ({: 13.8f}, {: 13.8f}, {: 13.8f}))'.format(self.mass,
                                                              self.symbol(),
                                                              self.coord[0],
                                                              self.coord[1],

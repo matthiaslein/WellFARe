@@ -1,13 +1,14 @@
-#############################################################################################################
-# Molecule class and class methods to be defined below
-#############################################################################################################
+########################################################
+# Molecule class and class methods to be defined below #
+########################################################
 
 from typing import Optional
 import math
 import numpy as np
 
 from atom import Atom
-from constants import SymbolToMass
+from constants import SymbolToMass, SymbolToRadius
+from messages import *
 
 
 class Molecule:
@@ -21,6 +22,9 @@ class Molecule:
         sum of nuclear charges and the number of electrons. The multiplicity is
         automatically set to the lowest possible value (1 or 2). There are also
         lists of bonds, angles and dihedrals (which are empty upon creation).
+        The cartesian coordinates of the molecule are inherited from the
+        individual cartesian coordinates of the atoms that make up the
+        molecule (and are stored in self.atoms).
 
         :param name: The name of the molecule.
         :param charge: The overall molecular charge.
@@ -104,7 +108,7 @@ class Molecule:
         else:
             self.mult = 1
         if verbosity >= 1:
-            print(" adding {:<3} {: .8f} {: .8f} {: .8f} to {}".format(
+            print(" adding {:<3} {: 13.8f} {: 13.8f} {: 13.8f} to {}".format(
                 a.symbol(), a.xpos(), a.ypos(), a.zpos(), self.name))
 
     def ch_atom(self, n: int, at: Atom) -> None:
@@ -134,768 +138,6 @@ class Molecule:
         self.atoms[n].set_y(y)
         self.atoms[n].set_z(z)
 
-    def replaceHwithTetrahedral(self, h, replacement="C", addH=3,
-                                orientation=0, ignoreWarning=False):
-        """ (Molecule) -> NoneType
-
-    Exchange the given hydrogen atom with an arbitrary other atom and, optionally, add up to 3
-    hydrogen atoms in a tetrahedral geometry.
-    Default behaviour is substitution by a CH₃ group. If only 1 or 2 hydrogen
-    atoms are added, an additional parameter "orientation" is needed to decide where the new
-    group "points".
-    """
-        # Safety check: h is indeed an H atom and has only one bond
-        if self.atoms[h].symbol != "H":
-            ProgramWarning("This is not a hydrogen atom!")
-            if ignoreWarning == False:
-                return
-        position = -1
-        for i in self.bonds:
-            if i[0] == h and position == -1:
-                position = i[1]
-            elif i[1] == h and position == -1:
-                position = i[0]
-            elif i[0] == h and position != -1:
-                ProgramWarning("This hydrogen atom has more than one bond!")
-                position = i[1]
-                if ignoreWarning == False:
-                    return
-            elif i[1] == h and position != -1:
-                ProgramWarning("This hydrogen atom has more than one bond!")
-                position = i[0]
-                if ignoreWarning == False:
-                    return
-        if position == -1:
-            ProgramWarning("This hydrogen atom has no bond!")
-            return
-        # Find one more atom that is bound to the atom in "position"
-        position2 = -1
-        for i in self.bonds:
-            if i[0] == position and i[1] != h:
-                position2 = i[1]
-            if i[1] == position and i[0] != h:
-                position2 = i[0]
-        if position2 == -1:
-            ProgramWarning("The C atom no seems to have only one bond!")
-            return
-        # Calculate the vector from C to H, scale it and put the replacement atom there
-        xcompo = self.atoms[h].coord[0] - self.atoms[position].coord[0]
-        ycompo = self.atoms[h].coord[1] - self.atoms[position].coord[1]
-        zcompo = self.atoms[h].coord[2] - self.atoms[position].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 110% of the sum of vdW radii  as the length of a slightly elongated bond
-        scale = (SymbolToRadius["C"] + SymbolToRadius[replacement]) * 1.1
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * scale
-        ycompo = (ycompo / norm) * scale
-        zcompo = (zcompo / norm) * scale
-        # Calculate the position of the replacement atom
-        xcompo = self.atoms[position].coord[0] + xcompo
-        ycompo = self.atoms[position].coord[1] + ycompo
-        zcompo = self.atoms[position].coord[2] + zcompo
-        # Add this new atom
-        self.add_atom(Atom(replacement, xcompo, ycompo, zcompo, 0.1))
-        # And call it's number newN for future reference
-        newAtom = self.num_atoms() - 1
-        if addH != 0:
-            # Setup the coordinates of the first hydrogen atom:
-            # We start by constructing the vector from the newly created N atom
-            # to the "old one" it is bonded to
-            xcompo = self.atoms[position].coord[0] - self.atoms[newAtom].coord[
-                0]
-            ycompo = self.atoms[position].coord[1] - self.atoms[newAtom].coord[
-                1]
-            zcompo = self.atoms[position].coord[2] - self.atoms[newAtom].coord[
-                2]
-            # Scale this vector to the "right" length:
-            # We choose 110% of the sum of vdW radii  as the length of a slightly elongated bond
-            scale = (SymbolToRadius["H"] + SymbolToRadius[replacement]) * 1.1
-            norm = math.sqrt(
-                xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-            xcompo = (xcompo / norm) * scale
-            ycompo = (ycompo / norm) * scale
-            zcompo = (zcompo / norm) * scale
-            # Next we determine the axis around which we want to rotate this vector:
-            # We use the vectors from the new N atom to the C atom and the vector
-            # from the N atom to the "second atom" we found that was also bonded
-            # to the C atom.
-            # Importantly, we keep its coordinates untouched once we have them,
-            # so we can create the other two hydrogen atoms in the same way.
-            crossPx = self.atoms[position2].coord[0] - \
-                      self.atoms[newAtom].coord[0]
-            crossPy = self.atoms[position2].coord[1] - \
-                      self.atoms[newAtom].coord[1]
-            crossPz = self.atoms[position2].coord[2] - \
-                      self.atoms[newAtom].coord[2]
-            cross = np.cross([crossPx, crossPy, crossPz],
-                             [xcompo, ycompo, zcompo])
-            # Then we build the rotation matrix
-            L = (cross[0] ** 2) + (cross[1] ** 2) + (cross[2] ** 2)
-            pi = np.radians(109.4712206)
-
-            RotMatrix = []
-            Rxx = (cross[0] ** 2 + (cross[1] ** 2 + cross[2] ** 2) * np.cos(
-                pi)) / L
-            Rxy = ((cross[0] * cross[1]) * (1 - np.cos(pi)) - cross[
-                2] * np.sqrt(L) * np.sin(pi)) / L
-            Rxz = ((cross[0] * cross[2]) * (1 - np.cos(pi)) + cross[
-                1] * np.sqrt(L) * np.sin(pi)) / L
-
-            Ryx = ((cross[0] * cross[1]) * (1 - np.cos(pi)) + cross[
-                2] * np.sqrt(L) * np.sin(pi)) / L
-            Ryy = (cross[1] ** 2 + (cross[0] ** 2 + cross[2] ** 2) * np.cos(
-                pi)) / L
-            Ryz = ((cross[1] * cross[2]) * (1 - np.cos(pi)) - cross[
-                0] * np.sqrt(L) * np.sin(pi)) / L
-
-            Rzx = ((cross[0] * cross[2]) * (1 - np.cos(pi)) - cross[
-                1] * np.sqrt(L) * np.sin(pi)) / L
-            Rzy = ((cross[1] * cross[2]) * (1 - np.cos(pi)) + cross[
-                0] * np.sqrt(L) * np.sin(pi)) / L
-            Rzz = (cross[2] ** 2 + (cross[0] ** 2 + cross[1] ** 2) * np.cos(
-                pi)) / L
-
-            RotMatrix.append([Rxx, Rxy, Rxz])
-            RotMatrix.append([Ryx, Ryy, Ryz])
-            RotMatrix.append([Rzx, Rzy, Rzz])
-
-            RotMatrix = np.matrix(RotMatrix)
-
-            vector = [xcompo, ycompo, zcompo]
-            vector = np.matrix(vector)
-            vector = RotMatrix.dot(np.matrix.transpose(vector))
-            vector = np.array(vector).flatten().tolist()
-            xcompo = vector[0]
-            ycompo = vector[1]
-            zcompo = vector[2]
-            # Calculate the position of the new H atom
-            xNew1 = self.atoms[newAtom].coord[0] + xcompo
-            yNew1 = self.atoms[newAtom].coord[1] + ycompo
-            zNew1 = self.atoms[newAtom].coord[2] + zcompo
-
-            # Next, we re-use the rotated coordinates and rotate them further
-            # by 120 degrees around the C-N bond
-            cross[0] = self.atoms[position].coord[0] - \
-                       self.atoms[newAtom].coord[0]
-            cross[1] = self.atoms[position].coord[1] - \
-                       self.atoms[newAtom].coord[1]
-            cross[2] = self.atoms[position].coord[2] - \
-                       self.atoms[newAtom].coord[2]
-            # We build the second rotation matrix
-            L = (cross[0] ** 2) + (cross[1] ** 2) + (cross[2] ** 2)
-            pi = np.radians(120.0)
-
-            RotMatrix = []
-            Rxx = (cross[0] ** 2 + (cross[1] ** 2 + cross[2] ** 2) * np.cos(
-                pi)) / L
-            Rxy = ((cross[0] * cross[1]) * (1 - np.cos(pi)) - cross[
-                2] * np.sqrt(L) * np.sin(pi)) / L
-            Rxz = ((cross[0] * cross[2]) * (1 - np.cos(pi)) + cross[
-                1] * np.sqrt(L) * np.sin(pi)) / L
-
-            Ryx = ((cross[0] * cross[1]) * (1 - np.cos(pi)) + cross[
-                2] * np.sqrt(L) * np.sin(pi)) / L
-            Ryy = (cross[1] ** 2 + (cross[0] ** 2 + cross[2] ** 2) * np.cos(
-                pi)) / L
-            Ryz = ((cross[1] * cross[2]) * (1 - np.cos(pi)) - cross[
-                0] * np.sqrt(L) * np.sin(pi)) / L
-
-            Rzx = ((cross[0] * cross[2]) * (1 - np.cos(pi)) - cross[
-                1] * np.sqrt(L) * np.sin(pi)) / L
-            Rzy = ((cross[1] * cross[2]) * (1 - np.cos(pi)) + cross[
-                0] * np.sqrt(L) * np.sin(pi)) / L
-            Rzz = (cross[2] ** 2 + (cross[0] ** 2 + cross[1] ** 2) * np.cos(
-                pi)) / L
-
-            RotMatrix.append([Rxx, Rxy, Rxz])
-            RotMatrix.append([Ryx, Ryy, Ryz])
-            RotMatrix.append([Rzx, Rzy, Rzz])
-
-            RotMatrix = np.matrix(RotMatrix)
-
-            vector = [xcompo, ycompo, zcompo]
-            vector = np.matrix(vector)
-            vector = RotMatrix.dot(np.matrix.transpose(vector))
-            vector = np.array(vector).flatten().tolist()
-            xcompo = vector[0]
-            ycompo = vector[1]
-            zcompo = vector[2]
-            # Calculate the position of the new H atom
-            xNew2 = self.atoms[newAtom].coord[0] + xcompo
-            yNew2 = self.atoms[newAtom].coord[1] + ycompo
-            zNew2 = self.atoms[newAtom].coord[2] + zcompo
-
-            # And then, we do this a third and last time...
-            vector = [xcompo, ycompo, zcompo]
-            vector = np.matrix(vector)
-            vector = RotMatrix.dot(np.matrix.transpose(vector))
-            vector = np.array(vector).flatten().tolist()
-            xcompo = vector[0]
-            ycompo = vector[1]
-            zcompo = vector[2]
-            # Calculate the position of the new H atom
-            xNew3 = self.atoms[newAtom].coord[0] + xcompo
-            yNew3 = self.atoms[newAtom].coord[1] + ycompo
-            zNew3 = self.atoms[newAtom].coord[2] + zcompo
-
-            if addH == 3:
-                self.add_atom(Atom("H", xNew1, yNew1, zNew1, 0.1))
-                self.add_atom(Atom("H", xNew2, yNew2, zNew2, 0.1))
-                self.add_atom(Atom("H", xNew3, yNew3, zNew3, 0.1))
-            elif addH == 2:
-                # Add two of the new atoms according to the chosen orientation
-                if orientation == 1:
-                    self.add_atom(Atom("H", xNew1, yNew1, zNew1, 0.1))
-                    self.add_atom(Atom("H", xNew3, yNew3, zNew3, 0.1))
-                elif orientation == 2:
-                    self.add_atom(Atom("H", xNew2, yNew2, zNew2, 0.1))
-                    self.add_atom(Atom("H", xNew3, yNew3, zNew3, 0.1))
-                else:
-                    self.add_atom(Atom("H", xNew1, yNew1, zNew1, 0.1))
-                    self.add_atom(Atom("H", xNew2, yNew2, zNew2, 0.1))
-            elif addH == 1:
-                # Add one of the new atoms according to the chosen orientation
-                if orientation == 1:
-                    self.add_atom(Atom("H", xNew2, yNew2, zNew2, 0.1))
-                elif orientation == 2:
-                    self.add_atom(Atom("H", xNew3, yNew3, zNew3, 0.1))
-                else:
-                    self.add_atom(Atom("H", xNew1, yNew1, zNew1, 0.1))
-
-        # Delete the initial hydrogen atom h # EXTREMELY MESSY!!!
-        del self.atoms[h]
-        return
-
-    def replaceHwithEthenyl(self, h, ignoreWarning=False):
-        """ (Molecule) -> NoneType
-
-    Exchange the given hydrogen atom by a "planar" CH2 group. This method requires the carbon atom whose
-    hydrogen atom is being replaced to possess two more hydrogen atoms (i.e. it only works on
-    methyl groups), because it will substitute the other two hydrogen atoms with a single h atom
-    in the correct position, given by the sp2 hybridisation of the carbon atoms.
-    """
-
-        # Safety check: h is indeed an H atom and has only one bond to a C atom
-        if self.atoms[h].symbol != "H":
-            ProgramWarning("This is not a hydrogen atom!")
-            if ignoreWarning == False:
-                return
-        position = -1
-        for i in self.bonds:
-            if i[0] == h and position == -1 and self.atoms[i[1]].symbol == "C":
-                position = i[1]
-            elif i[1] == h and position == -1 and self.atoms[
-                i[0]].symbol == "C":
-                position = i[0]
-            elif i[0] == h and position != -1:
-                ProgramWarning("This hydrogen atom has more than one bond!")
-                position = i[1]
-                if ignoreWarning == False:
-                    return
-            elif i[1] == h and position != -1:
-                ProgramWarning("This hydrogen atom has more than one bond!")
-                position = i[0]
-                if ignoreWarning == False:
-                    return
-        if position == -1:
-            ProgramWarning("This hydrogen atom has no bond!")
-            return
-        # Find two more hydrogen atoms that are bound to the C atom in "position"
-        position2 = -1
-        position3 = -1
-        for i in self.bonds:
-            if i[0] == position and i[1] != h and self.atoms[
-                i[1]].symbol == "H":
-                if position2 == -1:
-                    position2 = i[1]
-                elif position3 == -1:
-                    position3 = i[1]
-                    break
-            if i[1] == position and i[0] != h and self.atoms[
-                i[0]].symbol == "H":
-                if position2 == -1:
-                    position2 = i[0]
-                elif position3 == -1:
-                    position3 = i[0]
-                    break
-        print("The two other hydrogens are:", position2, " and ", position3)
-        if position3 == -1:
-            ProgramWarning("The C atom is not part of a CH₃ group!")
-            return
-
-        # Calculate the vector from C to H, scale it and put a new C atom there
-        xcompo = self.atoms[h].coord[0] - self.atoms[position].coord[0]
-        ycompo = self.atoms[h].coord[1] - self.atoms[position].coord[1]
-        zcompo = self.atoms[h].coord[2] - self.atoms[position].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 1.65 as the length of a slightly elongated C=C (double) bond
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * 1.65
-        ycompo = (ycompo / norm) * 1.65
-        zcompo = (zcompo / norm) * 1.65
-        # Calculate the position of the new C atom
-        xcompo = self.atoms[position].coord[0] + xcompo
-        ycompo = self.atoms[position].coord[1] + ycompo
-        zcompo = self.atoms[position].coord[2] + zcompo
-        # Add this new atom
-        self.add_atom(Atom("C", xcompo, ycompo, zcompo, 0.1))
-        # And call it's number newC for future reference
-        newC = self.num_atoms() - 1
-
-        # Again, setup the coordinates of the second new hydrogen atom:
-        # We start by constructing the vector from the newly created C atom
-        # to the "old one" it is bonded to
-        xcompo = self.atoms[position].coord[0] - self.atoms[newC].coord[0]
-        ycompo = self.atoms[position].coord[1] - self.atoms[newC].coord[1]
-        zcompo = self.atoms[position].coord[2] - self.atoms[newC].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 1.25 as the length of a slightly elongated C-H bond
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * 1.25
-        ycompo = (ycompo / norm) * 1.25
-        zcompo = (zcompo / norm) * 1.25
-        # Next we determine the axis around which we want to rotate this vector:
-        # We use the vectors from the new C atom to the first one and the vector
-        # from the new C atom to the "second atom" we found that was also bonded
-        # to the first C atom.
-
-        # Create a "composite position" between the other two hydrogens.
-        # We'll place the last hydrogen atom along this vector
-        xcomposit = (self.atoms[position2].coord[0] +
-                     self.atoms[position3].coord[0]) / 2
-        ycomposit = (self.atoms[position2].coord[1] +
-                     self.atoms[position3].coord[1]) / 2
-        zcomposit = (self.atoms[position2].coord[2] +
-                     self.atoms[position3].coord[2]) / 2
-
-        # Importantly, we keep its coordinates untouched once we have them,
-        # so we can create the other two hydrogen atoms in the same way.
-        crossPx = xcomposit - self.atoms[newC].coord[0]
-        crossPy = ycomposit - self.atoms[newC].coord[1]
-        crossPz = zcomposit - self.atoms[newC].coord[2]
-        cross = np.cross([crossPx, crossPy, crossPz], [xcompo, ycompo, zcompo])
-        # Then we build the rotation matrix
-        L = (cross[0] ** 2) + (cross[1] ** 2) + (cross[2] ** 2)
-        pi = np.radians(120.0)
-
-        RotMatrix = []
-        Rxx = (cross[0] ** 2 + (cross[1] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Rxy = ((cross[0] * cross[1]) * (1 - np.cos(pi)) - cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rxz = ((cross[0] * cross[2]) * (1 - np.cos(pi)) + cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Ryx = ((cross[0] * cross[1]) * (1 - np.cos(pi)) + cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Ryy = (cross[1] ** 2 + (cross[0] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Ryz = ((cross[1] * cross[2]) * (1 - np.cos(pi)) - cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Rzx = ((cross[0] * cross[2]) * (1 - np.cos(pi)) - cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzy = ((cross[1] * cross[2]) * (1 - np.cos(pi)) + cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzz = (cross[2] ** 2 + (cross[0] ** 2 + cross[1] ** 2) * np.cos(
-            pi)) / L
-
-        RotMatrix.append([Rxx, Rxy, Rxz])
-        RotMatrix.append([Ryx, Ryy, Ryz])
-        RotMatrix.append([Rzx, Rzy, Rzz])
-
-        RotMatrix = np.matrix(RotMatrix)
-
-        vector = [xcompo, ycompo, zcompo]
-        vector = np.matrix(vector)
-        vector = RotMatrix.dot(np.matrix.transpose(vector))
-        vector = np.array(vector).flatten().tolist()
-        xcompo = vector[0]
-        ycompo = vector[1]
-        zcompo = vector[2]
-        # Calculate the position of the new H atom
-        xNew1 = self.atoms[newC].coord[0] + xcompo
-        yNew1 = self.atoms[newC].coord[1] + ycompo
-        zNew1 = self.atoms[newC].coord[2] + zcompo
-        # Add this new atom
-        self.add_atom(Atom("H", xNew1, yNew1, zNew1, 0.1))
-
-        # Setup the coordinates of the first new hydrogen atom:
-        # We start by constructing the vector from the newly created C atom
-        # to the "old one" it is bonded to
-        xcompo = self.atoms[position].coord[0] - self.atoms[newC].coord[0]
-        ycompo = self.atoms[position].coord[1] - self.atoms[newC].coord[1]
-        zcompo = self.atoms[position].coord[2] - self.atoms[newC].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 1.25 as the length of a slightly elongated C-H bond
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * 1.25
-        ycompo = (ycompo / norm) * 1.25
-        zcompo = (zcompo / norm) * 1.25
-        # Next we determine the axis around which we want to rotate this vector:
-        # We use the vectors from the new C atom to the first one and the vector
-        # from the new C atom to the "second atom" we found that was also bonded
-        # to the first C atom.
-
-        # Create a "composite position" between the other two hydrogens.
-        # We'll place the last hydrogen atom along this vector
-        xcomposit = (self.atoms[position2].coord[0] +
-                     self.atoms[position3].coord[0]) / 2
-        ycomposit = (self.atoms[position2].coord[1] +
-                     self.atoms[position3].coord[1]) / 2
-        zcomposit = (self.atoms[position2].coord[2] +
-                     self.atoms[position3].coord[2]) / 2
-
-        # Importantly, we keep its coordinates untouched once we have them,
-        # so we can create the other two hydrogen atoms in the same way.
-        crossPx = xcomposit - self.atoms[newC].coord[0]
-        crossPy = ycomposit - self.atoms[newC].coord[1]
-        crossPz = zcomposit - self.atoms[newC].coord[2]
-        cross = np.cross([crossPx, crossPy, crossPz], [xcompo, ycompo, zcompo])
-        # Then we build the rotation matrix
-        L = (cross[0] ** 2) + (cross[1] ** 2) + (cross[2] ** 2)
-        pi = np.radians(240.0)
-
-        RotMatrix = []
-        Rxx = (cross[0] ** 2 + (cross[1] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Rxy = ((cross[0] * cross[1]) * (1 - np.cos(pi)) - cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rxz = ((cross[0] * cross[2]) * (1 - np.cos(pi)) + cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Ryx = ((cross[0] * cross[1]) * (1 - np.cos(pi)) + cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Ryy = (cross[1] ** 2 + (cross[0] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Ryz = ((cross[1] * cross[2]) * (1 - np.cos(pi)) - cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Rzx = ((cross[0] * cross[2]) * (1 - np.cos(pi)) - cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzy = ((cross[1] * cross[2]) * (1 - np.cos(pi)) + cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzz = (cross[2] ** 2 + (cross[0] ** 2 + cross[1] ** 2) * np.cos(
-            pi)) / L
-
-        RotMatrix.append([Rxx, Rxy, Rxz])
-        RotMatrix.append([Ryx, Ryy, Ryz])
-        RotMatrix.append([Rzx, Rzy, Rzz])
-
-        RotMatrix = np.matrix(RotMatrix)
-
-        vector = [xcompo, ycompo, zcompo]
-        vector = np.matrix(vector)
-        vector = RotMatrix.dot(np.matrix.transpose(vector))
-        vector = np.array(vector).flatten().tolist()
-        xcompo = vector[0]
-        ycompo = vector[1]
-        zcompo = vector[2]
-        # Calculate the position of the new H atom
-        xNew1 = self.atoms[newC].coord[0] + xcompo
-        yNew1 = self.atoms[newC].coord[1] + ycompo
-        zNew1 = self.atoms[newC].coord[2] + zcompo
-        # Add this new atom
-        self.add_atom(Atom("H", xNew1, yNew1, zNew1, 0.1))
-
-        # Calculate the vector from C to the compisite position, scale it and put the last H atom there
-        xcompo = xcomposit - self.atoms[position].coord[0]
-        ycompo = ycomposit - self.atoms[position].coord[1]
-        zcompo = zcomposit - self.atoms[position].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 1.25 as the length of a slightly elongated C-H bond
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * 1.25
-        ycompo = (ycompo / norm) * 1.25
-        zcompo = (zcompo / norm) * 1.25
-        # Calculate the position of the new C atom
-        xcompo = self.atoms[position].coord[0] + xcompo
-        ycompo = self.atoms[position].coord[1] + ycompo
-        zcompo = self.atoms[position].coord[2] + zcompo
-        # Add this new atom
-        self.add_atom(Atom("H", xcompo, ycompo, zcompo, 0.1))
-
-        # Delete the initial hydrogen atom h and the two hydrogen atoms in position2 and position3
-        # That were bound to the other carbon atom
-        # EXTREMELY MESSY!!!
-        for i in sorted([h, position2, position3], key=int, reverse=True):
-            del self.atoms[i]
-
-    def replaceHwithCHO(self, h, orientation=0, ignoreWarning=False):
-        """ (Molecule) -> NoneType
-
-    Exchange the given hydrogen atom with a keto (CHO) group.
-    The "orientation" parameter is needed to decide where the new
-    group "points".
-    """
-        # Safety check: h is indeed an H atom and has only one bond
-        if self.atoms[h].symbol != "H":
-            ProgramWarning("This is not a hydrogen atom!")
-            if ignoreWarning == False:
-                return
-        position = -1
-        for i in self.bonds:
-            if i[0] == h and position == -1:
-                position = i[1]
-            elif i[1] == h and position == -1:
-                position = i[0]
-            elif i[0] == h and position != -1:
-                ProgramWarning("This hydrogen atom has more than one bond!")
-                position = i[1]
-                if ignoreWarning == False:
-                    return
-            elif i[1] == h and position != -1:
-                ProgramWarning("This hydrogen atom has more than one bond!")
-                position = i[0]
-                if ignoreWarning == False:
-                    return
-        if position == -1:
-            ProgramWarning("This hydrogen atom has no bond!")
-            return
-        # Find one more atom that is bound to the atom in "position"
-        position2 = -1
-        for i in self.bonds:
-            if i[0] == position and i[1] != h:
-                position2 = i[1]
-            if i[1] == position and i[0] != h:
-                position2 = i[0]
-        if position2 == -1:
-            ProgramWarning("The C atom no seems to have only one bond!")
-            return
-        # Calculate the vector from C to H, scale it and put the replacement atom there
-        xcompo = self.atoms[h].coord[0] - self.atoms[position].coord[0]
-        ycompo = self.atoms[h].coord[1] - self.atoms[position].coord[1]
-        zcompo = self.atoms[h].coord[2] - self.atoms[position].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 110% of the sum of vdW radii  as the length of a slightly elongated bond
-        scale = (SymbolToRadius["C"] + SymbolToRadius["C"]) * 1.1
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * scale
-        ycompo = (ycompo / norm) * scale
-        zcompo = (zcompo / norm) * scale
-        # Calculate the position of the replacement atom
-        xcompo = self.atoms[position].coord[0] + xcompo
-        ycompo = self.atoms[position].coord[1] + ycompo
-        zcompo = self.atoms[position].coord[2] + zcompo
-        # Add this new atom
-        self.add_atom(Atom("C", xcompo, ycompo, zcompo, 0.1))
-        # And call it's number newAtom for future reference
-        newAtom = self.num_atoms() - 1
-
-        # Setup the coordinates of the oxygen atom:
-        # We start by constructing the vector from the newly created C atom
-        # to the "old one" it is bonded to
-        xcompo = self.atoms[position].coord[0] - self.atoms[newAtom].coord[0]
-        ycompo = self.atoms[position].coord[1] - self.atoms[newAtom].coord[1]
-        zcompo = self.atoms[position].coord[2] - self.atoms[newAtom].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 110% of the sum of vdW radii  as the length of a slightly elongated bond
-        scale = (SymbolToRadius["O"] + SymbolToRadius["C"]) * 1.1
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * scale
-        ycompo = (ycompo / norm) * scale
-        zcompo = (zcompo / norm) * scale
-        # Next we determine the axis around which we want to rotate this vector:
-        # We use the vectors from the new N atom to the C atom and the vector
-        # from the N atom to the "second atom" we found that was also bonded
-        # to the C atom.
-        # Importantly, we keep its coordinates untouched once we have them,
-        # so we can create the other two hydrogen atoms in the same way.
-        crossPx = self.atoms[position2].coord[0] - self.atoms[newAtom].coord[0]
-        crossPy = self.atoms[position2].coord[1] - self.atoms[newAtom].coord[1]
-        crossPz = self.atoms[position2].coord[2] - self.atoms[newAtom].coord[2]
-        cross = np.cross([crossPx, crossPy, crossPz], [xcompo, ycompo, zcompo])
-        # Then we build the rotation matrix
-        L = (cross[0] ** 2) + (cross[1] ** 2) + (cross[2] ** 2)
-        pi = np.radians(120.0)
-
-        RotMatrix = []
-        Rxx = (cross[0] ** 2 + (cross[1] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Rxy = ((cross[0] * cross[1]) * (1 - np.cos(pi)) - cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rxz = ((cross[0] * cross[2]) * (1 - np.cos(pi)) + cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Ryx = ((cross[0] * cross[1]) * (1 - np.cos(pi)) + cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Ryy = (cross[1] ** 2 + (cross[0] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Ryz = ((cross[1] * cross[2]) * (1 - np.cos(pi)) - cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Rzx = ((cross[0] * cross[2]) * (1 - np.cos(pi)) - cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzy = ((cross[1] * cross[2]) * (1 - np.cos(pi)) + cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzz = (cross[2] ** 2 + (cross[0] ** 2 + cross[1] ** 2) * np.cos(
-            pi)) / L
-
-        RotMatrix.append([Rxx, Rxy, Rxz])
-        RotMatrix.append([Ryx, Ryy, Ryz])
-        RotMatrix.append([Rzx, Rzy, Rzz])
-
-        RotMatrix = np.matrix(RotMatrix)
-
-        vector = [xcompo, ycompo, zcompo]
-        vector = np.matrix(vector)
-        vector = RotMatrix.dot(np.matrix.transpose(vector))
-        vector = np.array(vector).flatten().tolist()
-        xcompo = vector[0]
-        ycompo = vector[1]
-        zcompo = vector[2]
-        # Calculate the position of the new O atom
-        # xNewO = self.atoms[newAtom].coord[0] + xcompo
-        # yNewO = self.atoms[newAtom].coord[1] + ycompo
-        # zNewO = self.atoms[newAtom].coord[2] + zcompo
-        xNewO = xcompo
-        yNewO = ycompo
-        zNewO = zcompo
-
-        # The, we setup the coordinates of the hydrogen atom in the same way:
-        # We start by constructing the vector from the newly created C atom
-        # to the "old one" it is bonded to
-        xcompo = self.atoms[position].coord[0] - self.atoms[newAtom].coord[0]
-        ycompo = self.atoms[position].coord[1] - self.atoms[newAtom].coord[1]
-        zcompo = self.atoms[position].coord[2] - self.atoms[newAtom].coord[2]
-        # Scale this vector to the "right" length:
-        # We choose 110% of the sum of vdW radii  as the length of a slightly elongated bond
-        scale = (SymbolToRadius["H"] + SymbolToRadius["C"]) * 1.1
-        norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
-        xcompo = (xcompo / norm) * scale
-        ycompo = (ycompo / norm) * scale
-        zcompo = (zcompo / norm) * scale
-        # Next we determine the axis around which we want to rotate this vector:
-        # We use the vectors from the new C atom to the C atom and the vector
-        # from the C atom to the "second atom" we found that was also bonded
-        # to the C atom.
-        # Importantly, we keep its coordinates untouched once we have them,
-        # so we can create the other two hydrogen atoms in the same way.
-        crossPx = self.atoms[position2].coord[0] - self.atoms[newAtom].coord[0]
-        crossPy = self.atoms[position2].coord[1] - self.atoms[newAtom].coord[1]
-        crossPz = self.atoms[position2].coord[2] - self.atoms[newAtom].coord[2]
-        cross = np.cross([crossPx, crossPy, crossPz], [xcompo, ycompo, zcompo])
-        # Then we build the rotation matrix
-        L = (cross[0] ** 2) + (cross[1] ** 2) + (cross[2] ** 2)
-        pi = np.radians(240.0)
-
-        RotMatrix = []
-        Rxx = (cross[0] ** 2 + (cross[1] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Rxy = ((cross[0] * cross[1]) * (1 - np.cos(pi)) - cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rxz = ((cross[0] * cross[2]) * (1 - np.cos(pi)) + cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Ryx = ((cross[0] * cross[1]) * (1 - np.cos(pi)) + cross[2] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Ryy = (cross[1] ** 2 + (cross[0] ** 2 + cross[2] ** 2) * np.cos(
-            pi)) / L
-        Ryz = ((cross[1] * cross[2]) * (1 - np.cos(pi)) - cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-
-        Rzx = ((cross[0] * cross[2]) * (1 - np.cos(pi)) - cross[1] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzy = ((cross[1] * cross[2]) * (1 - np.cos(pi)) + cross[0] * np.sqrt(
-            L) * np.sin(pi)) / L
-        Rzz = (cross[2] ** 2 + (cross[0] ** 2 + cross[1] ** 2) * np.cos(
-            pi)) / L
-
-        RotMatrix.append([Rxx, Rxy, Rxz])
-        RotMatrix.append([Ryx, Ryy, Ryz])
-        RotMatrix.append([Rzx, Rzy, Rzz])
-
-        RotMatrix = np.matrix(RotMatrix)
-
-        vector = [xcompo, ycompo, zcompo]
-        vector = np.matrix(vector)
-        vector = RotMatrix.dot(np.matrix.transpose(vector))
-        vector = np.array(vector).flatten().tolist()
-        xcompo = vector[0]
-        ycompo = vector[1]
-        zcompo = vector[2]
-        # Calculate the position of the new O atom
-        # xNewH = self.atoms[newAtom].coord[0] + xcompo
-        # yNewH = self.atoms[newAtom].coord[1] + ycompo
-        # zNewH = self.atoms[newAtom].coord[2] + zcompo
-        xNewH = xcompo
-        yNewH = ycompo
-        zNewH = zcompo
-
-        if orientation != 0:
-            # Next, we re-use the rotated coordinates and rotate them further
-            # by 120 or 240 degrees around the C-C bond
-            cross[0] = self.atoms[position].coord[0] - \
-                       self.atoms[newAtom].coord[0]
-            cross[1] = self.atoms[position].coord[1] - \
-                       self.atoms[newAtom].coord[1]
-            cross[2] = self.atoms[position].coord[2] - \
-                       self.atoms[newAtom].coord[2]
-            # We build the second rotation matrix
-            L = (cross[0] ** 2) + (cross[1] ** 2) + (cross[2] ** 2)
-            if orientation == 1:
-                pi = np.radians(120.0)
-            else:
-                pi = np.radians(240.0)
-
-            RotMatrix = []
-            Rxx = (cross[0] ** 2 + (cross[1] ** 2 + cross[2] ** 2) * np.cos(
-                pi)) / L
-            Rxy = ((cross[0] * cross[1]) * (1 - np.cos(pi)) - cross[
-                2] * np.sqrt(L) * np.sin(pi)) / L
-            Rxz = ((cross[0] * cross[2]) * (1 - np.cos(pi)) + cross[
-                1] * np.sqrt(L) * np.sin(pi)) / L
-
-            Ryx = ((cross[0] * cross[1]) * (1 - np.cos(pi)) + cross[
-                2] * np.sqrt(L) * np.sin(pi)) / L
-            Ryy = (cross[1] ** 2 + (cross[0] ** 2 + cross[2] ** 2) * np.cos(
-                pi)) / L
-            Ryz = ((cross[1] * cross[2]) * (1 - np.cos(pi)) - cross[
-                0] * np.sqrt(L) * np.sin(pi)) / L
-
-            Rzx = ((cross[0] * cross[2]) * (1 - np.cos(pi)) - cross[
-                1] * np.sqrt(L) * np.sin(pi)) / L
-            Rzy = ((cross[1] * cross[2]) * (1 - np.cos(pi)) + cross[
-                0] * np.sqrt(L) * np.sin(pi)) / L
-            Rzz = (cross[2] ** 2 + (cross[0] ** 2 + cross[1] ** 2) * np.cos(
-                pi)) / L
-
-            RotMatrix.append([Rxx, Rxy, Rxz])
-            RotMatrix.append([Ryx, Ryy, Ryz])
-            RotMatrix.append([Rzx, Rzy, Rzz])
-
-            RotMatrix = np.matrix(RotMatrix)
-
-            vector = [xNewO, yNewO, zNewO]
-            vector = np.matrix(vector)
-            vector = RotMatrix.dot(np.matrix.transpose(vector))
-            vector = np.array(vector).flatten().tolist()
-            xNewO = vector[0]
-            yNewO = vector[1]
-            zNewO = vector[2]
-
-            vector = [xNewH, yNewH, zNewH]
-            vector = np.matrix(vector)
-            vector = RotMatrix.dot(np.matrix.transpose(vector))
-            vector = np.array(vector).flatten().tolist()
-            xNewH = vector[0]
-            yNewH = vector[1]
-            zNewH = vector[2]
-
-        # Calculate the position of the new O and H atoms and add them
-        xNewO = self.atoms[newAtom].coord[0] + xNewO
-        yNewO = self.atoms[newAtom].coord[1] + yNewO
-        zNewO = self.atoms[newAtom].coord[2] + zNewO
-        self.add_atom(Atom("O", xNewO, yNewO, zNewO, 0.1))
-        xNewH = self.atoms[newAtom].coord[0] + xNewH
-        yNewH = self.atoms[newAtom].coord[1] + yNewH
-        zNewH = self.atoms[newAtom].coord[2] + zNewH
-        self.add_atom(Atom("H", xNewH, yNewH, zNewH, 0.1))
-
-        # Delete the initial hydrogen atom h # EXTREMELY MESSY!!!
-        del self.atoms[h]
-        return
-
     def add_bond(self, a: int, b: int) -> None:
         """
         Adds a bond between atoms a and b to the list of bonds. The indices a
@@ -922,7 +164,7 @@ class Molecule:
                 exists = True
 
         # Append bond to list if doesn't exist and is plausible
-        if exists == False and a >= 0 and b >= 0 and a <= len(
+        if exists is False and a >= 0 and b >= 0 and a <= len(
                 self.atoms) and b <= len(self.atoms) and c != d:
             self.bonds.append([c, d])
 
@@ -950,7 +192,7 @@ class Molecule:
                 exists = True
 
         # Remove if it does
-        if exists == True:
+        if exists is True:
             self.bonds.remove([c, d])
 
     def add_angle(self, a: int, b: int, c: int) -> None:
@@ -970,10 +212,9 @@ class Molecule:
                 exists = True
 
         # Append angle to list if doesn't exist and is plausible.
-        if exists is False and a >= 0 and b >= 0 and c >= 0 and a <= len(
-                self.atoms) and b <= len(
-            self.atoms) and c <= len(
-            self.atoms) and a != b and a != c and b != c:
+        if exists is False and a >= 0 and b >= 0 and c >= 0 and \
+                a <= len(self.atoms) and b <= len(self.atoms) and \
+                c <= len(self.atoms) and a != b and a != c and b != c:
             self.angles.append([a, b, c])
 
     def add_dihedral(self, a: int, b: int, c: int, d: int) -> None:
@@ -1001,6 +242,15 @@ class Molecule:
                 c <= len(self.atoms) and d <= len(self.atoms) and \
                 a != b and a != c and a != d and b != c and b != d and c != d:
             self.dihedrals.append([a, b, c, d])
+
+    def atm_symbol(self, i: int) -> str:
+        """
+        Report the atomic symbol of atom i.
+
+        :param i: Atom to locate.
+        :return: The atom's atomic symbol
+        """
+        return self.atoms[i].symbol()
 
     def atm_pos_x(self, i: int) -> float:
         """
@@ -1031,11 +281,11 @@ class Molecule:
 
     def atm_atm_dist(self, i: int, j: int) -> float:
         """
-        Report the distance between atoms i and j in Ångströms.
+        Report the distance between atoms i and j in Ångström.
 
         :param i: First atom for distance measurement.
         :param j: Second atom for distance measurement.
-        :return: The distance between atoms i and j in Ångströms.
+        :return: The distance between atoms i and j in Ångström.
         """
 
         distance = (self.atm_pos_x(i) - self.atm_pos_x(j)) * (
@@ -1047,48 +297,83 @@ class Molecule:
 
         return math.sqrt(distance)
 
-    def bond_angle(self, i: int) -> float:
+    def bond_dist(self, i: int) -> float:
         """
-        Report the angle described by three atoms in the bonds list.
+        Report the distance between two atoms in the bonds list in Ångström.
 
-        :param i: Index of the bond angle from the list of angles.
+        :param i: Index of the bond from the list of bonds..
+        :return: The distance between the in Ångström.
+        """
+
+        atom1 = self.bonds[i][0]
+        atom2 = self.bonds[i][1]
+        distance = self.atm_atm_dist(atom1, atom2)
+
+        return distance
+
+    def atm_atm_atm_angle(self, i: int, j: int, k: int) -> float:
+        """
+        Report the angle between three atoms in radians.
+
+        :param i: First atom for angle measurement.
+        :param j: Second atom for angle measurement.
+        :param k: Third atom for angle measurement.
         :return: The numerical value of the angle in radians.
         """
 
-
         # Calculate the distance between each pair of atoms
-        angle = self.angles[i]
-        d_bond_1 = self.atm_atm_dist(angle[0], angle[1])
-        d_bond_2 = self.atm_atm_dist(angle[1], angle[2])
-        d_non_bond = self.atm_atm_dist(angle[0], angle[2])
+        d_bond_1 = self.atm_atm_dist(i, j)
+        d_bond_2 = self.atm_atm_dist(j, k)
+        d_non_bond = self.atm_atm_dist(i, k)
 
         # Use those distances and the cosine rule to calculate bond angle theta
         numerator = d_bond_1 ** 2 + d_bond_2 ** 2 - d_non_bond ** 2
         denominator = 2 * d_bond_1 * d_bond_2
         argument = numerator / denominator
+        # This safety check was necessary because of a bug elsewhere once...
+        # if argument > 1.0:
+        #     argument = 1.0
+        # elif argument < -1.0:
+        #     argument = -1.0
         theta = np.arccos(argument)
 
         return theta
 
-    def dihedral_angle(self, i: int) -> float:
+    def bond_angle(self, i: int) -> float:
         """
-        Report the dihedral angle described by a set of four atoms in the list
-        of dihedrals.
+        Report the angle described by three atoms in the bonds list in radians.
 
-        :param i: Index of the dihedral angle in the list of dihedrals.
+        :param i: Index of the bond angle from the list of angles.
         :return: The numerical value of the angle in radians.
         """
+        atom1 = self.angles[i][0]
+        atom2 = self.angles[i][1]
+        atom3 = self.angles[i][2]
+        angle = self.atm_atm_atm_angle(atom1, atom2, atom3)
 
+        return angle
+
+    def atm_atm_atm_atm_dihedral(self, i: int, j: int, k: int,
+                                 l: int) -> float:
+        """
+        Report the dihedral angle described by a set of four atoms in radians.
+
+
+        :param i: First atom for angle measurement.
+        :param j: Second atom for angle measurement.
+        :param k: Third atom for angle measurement.
+        :param l: Fourth atom for angle measurement.
+        :return: The numerical value of the dihedral angle in radians.
+        """
 
         # Calculate the vectors lying along bonds, and their cross products
-        dihedral = self.dihedrals[i]
-        atom_e1 = self.atoms[dihedral[0]]
-        atom_b1 = self.atoms[dihedral[1]]
-        atom_b2 = self.atoms[dihedral[2]]
-        atom_e2 = self.atoms[dihedral[3]]
-        end_1 = [atom_e1.coord[i] - atom_b1.coord[i] for i in range(3)]
-        bridge = [atom_b1.coord[i] - atom_b2.coord[i] for i in range(3)]
-        end_2 = [atom_b2.coord[i] - atom_e2.coord[i] for i in range(3)]
+        atom_e1 = self.atoms[i]
+        atom_b1 = self.atoms[j]
+        atom_b2 = self.atoms[k]
+        atom_e2 = self.atoms[l]
+        end_1 = [atom_e1.coord[idx] - atom_b1.coord[idx] for idx in range(3)]
+        bridge = [atom_b1.coord[idx] - atom_b2.coord[idx] for idx in range(3)]
+        end_2 = [atom_b2.coord[idx] - atom_e2.coord[idx] for idx in range(3)]
         vnormal_1 = np.cross(end_1, bridge)
         vnormal_2 = np.cross(bridge, end_2)
 
@@ -1096,11 +381,11 @@ class Molecule:
         # vnormal_2 as the x axis
         vcross = np.cross(vnormal_2, bridge)
         norm_vn2 = np.linalg.norm(vnormal_2)
-        norm_b = np.linalg.norm(bridge)
+        # norm_b = np.linalg.norm(bridge)
         norm_vc = np.linalg.norm(vcross)
-        basis_vn2 = [vnormal_2[i] / norm_vn2 for i in range(3)]
-        basis_b = [bridge[i] / norm_b for i in range(3)]
-        basis_cv = [vcross[i] / norm_vc for i in range(3)]
+        basis_vn2 = [vnormal_2[idx] / norm_vn2 for idx in range(3)]
+        # basis_b = [bridge[idx] / norm_b for idx in range(3)]
+        basis_cv = [vcross[idx] / norm_vc for idx in range(3)]
 
         # Find the signed angle betw. vnormal_1 and vnormal_2 in the new frame
         vn1_coord_n2 = np.dot(vnormal_1, basis_vn2)
@@ -1109,15 +394,34 @@ class Molecule:
 
         return psi
 
-    def set_mult(self, M: int) -> None:
+    def dihedral_angle(self, i: int) -> float:
+        """
+        Report the dihedral angle described by a set of four atoms in the list
+        of dihedrals in radians.
+
+        :param i: Index of the dihedral angle in the list of dihedrals.
+        :return: The numerical value of the angle in radians.
+        """
+
+        atom1 = self.dihedrals[i][0]
+        atom2 = self.dihedrals[i][1]
+        atom3 = self.dihedrals[i][2]
+        atom4 = self.dihedrals[i][3]
+
+        dihedral = self.atm_atm_atm_atm_dihedral(atom1, atom2, atom3, atom4)
+
+        return dihedral
+
+    def set_mult(self, multiplicity: int) -> None:
         """
         Set the multiplicity of the molecule to M
 
-        :param M: Value of the multiplicity (i.e. 1 for singlet, 2 for doublet)
+        :param multiplicity: Value of the multiplicity (i.e. 1 for singlet,
+                             2 for doublet, ...)
         :return: None
         """
 
-        self.mult = M
+        self.mult = multiplicity
 
     def print_mol(self, output: str = "cart", comment: Optional[str] = None,
                   file: Optional[str] = None) -> str:
@@ -1148,34 +452,35 @@ class Molecule:
         else:
             commentline = comment
 
+        s = ""
         if output == "cart":
             # Plain cartesian coordinates - nothing else
-            s = ""
             for i in self.atoms:
-                t = "{:<3} {: .8f} {: .8f} {: .8f}\n".format(i.symbol(),
-                                                             i.xpos(),
-                                                             i.ypos(),
-                                                             i.zpos())
+                t = "{:<3} {: 13.8f} {: 13.8f} {: 13.8f}\n".format(i.symbol(),
+                                                                   i.xpos(),
+                                                                   i.ypos(),
+                                                                   i.zpos())
                 s = s + t
         elif output == "xyz":
             # xyz-file format. Number of atoms first, comment line,
             # then coordinates
             s = str(self.num_atoms()) + "\n" + commentline + "\n"
             for i in self.atoms:
-                t = "{:<3} {: .8f} {: .8f} {: .8f}\n".format(i.symbol(),
-                                                             i.xpos(),
-                                                             i.ypos(),
-                                                             i.zpos())
+                t = "{:<3} {: 13.8f} {: 13.8f} {: 13.8f}\n".format(i.symbol(),
+                                                                   i.xpos(),
+                                                                   i.ypos(),
+                                                                   i.zpos())
                 s = s + t
         elif output == "gamess":
             # xyz coordinates in Gamess format
             s = " $DATA\n" + commentline + "\nC1\n"
             for i in self.atoms:
-                t = "{:<3} {:<3d} {: .8f} {: .8f} {: .8f}\n".format(i.symbol(),
-                                                                    i.charge,
-                                                                    i.xpos(),
-                                                                    i.ypos(),
-                                                                    i.zpos())
+                t = "{:<3} {:<3d} {: 13.8f} {: 13.8f} {: 13.8f}\n".format(
+                    i.symbol(),
+                    i.charge,
+                    i.xpos(),
+                    i.ypos(),
+                    i.zpos())
                 s = s + t
             s = s + " $END\n"
         elif output == "gauss":
@@ -1184,12 +489,13 @@ class Molecule:
                 self.mult) + "\n"
             for i in self.atoms:
                 if i.mass == SymbolToMass[i.symbol()]:
-                    t = "{:<3} {: .8f} {: .8f} {: .8f}\n".format(i.symbol(),
-                                                                 i.xpos(),
-                                                                 i.ypos(),
-                                                                 i.zpos())
+                    t = "{:<3} {: 13.8f} {: 13.8f} {: 13.8f}\n".format(
+                        i.symbol(),
+                        i.xpos(),
+                        i.ypos(),
+                        i.zpos())
                 else:
-                    t = "{} {: .8f} {: .8f} {: .8f}\n".format(
+                    t = "{} {: 13.8f} {: 13.8f} {: 13.8f}\n".format(
                         i.symbol() + "(Iso=" + str(i.mass) + ")",
                         i.xpos(),
                         i.ypos(),
@@ -1202,13 +508,300 @@ class Molecule:
             try:
                 f = open(file + "." + output, 'w')
                 f.close()
-            except:
-                ProgramError("Cannot open " + file + " for writing.")
+            except OSError:
+                msg_program_error("Cannot open " + file + " for writing.")
             # Then write the string we created above
             with open(file + "." + output, "w") as text_file:
                 print("{}".format(s), file=text_file)
 
         return s
+
+
+def build_molecular_dihedrals(molecule, verbosity=0):
+    """
+
+    :param molecule: The molecule to be operated on
+    :param verbosity: How chatty this method is
+    :return: A list of the values of the dihedral angles in the same order as
+             the dihedrals that have been identified
+    """
+
+    list_of_dihedrals = []
+
+    if len(molecule.angles) > 1:
+        if verbosity >= 2:
+            print("\nLooking for dihedrals in WellFARe molecule: ",
+                  molecule.name)
+        for i in range(0, len(molecule.angles)):
+            for j in range(i + 1, len(molecule.angles)):
+                if molecule.angles[i][1] == molecule.angles[j][0] and \
+                        molecule.angles[i][2] == molecule.angles[j][1]:
+                    molecule.add_dihedral(molecule.angles[i][0],
+                                          molecule.angles[i][1],
+                                          molecule.angles[i][2],
+                                          molecule.angles[j][2])
+                    list_of_dihedrals.append(
+                        math.degrees(molecule.dihedral_angle(
+                            len(molecule.dihedrals) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                                molecule.atoms[molecule.angles[i][0]].symbol(),
+                                molecule.angles[i][0],
+                                molecule.atoms[molecule.angles[i][1]].symbol(),
+                                molecule.angles[i][1],
+                                molecule.atoms[molecule.angles[i][2]].symbol(),
+                                molecule.angles[i][2],
+                                molecule.atoms[molecule.angles[j][2]].symbol(),
+                                molecule.angles[j][2],
+                                list_of_dihedrals[-1]))
+                if molecule.angles[i][1] == molecule.angles[j][2] and \
+                        molecule.angles[i][2] == molecule.angles[j][1]:
+                    molecule.add_dihedral(molecule.angles[i][0],
+                                          molecule.angles[i][1],
+                                          molecule.angles[i][2],
+                                          molecule.angles[j][0])
+                    list_of_dihedrals.append(
+                        math.degrees(molecule.dihedral_angle(
+                            len(molecule.dihedrals) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                                molecule.atoms[molecule.angles[i][0]].symbol(),
+                                molecule.angles[i][0],
+                                molecule.atoms[molecule.angles[i][1]].symbol(),
+                                molecule.angles[i][1],
+                                molecule.atoms[molecule.angles[i][2]].symbol(),
+                                molecule.angles[i][2],
+                                molecule.atoms[molecule.angles[j][0]].symbol(),
+                                molecule.angles[j][0],
+                                list_of_dihedrals[-1]))
+                if molecule.angles[i][1] == molecule.angles[j][0] and \
+                        molecule.angles[i][0] == molecule.angles[j][1]:
+                    molecule.add_dihedral(molecule.angles[i][2],
+                                          molecule.angles[j][0],
+                                          molecule.angles[j][1],
+                                          molecule.angles[j][2])
+                    list_of_dihedrals.append(
+                        math.degrees(molecule.dihedral_angle(
+                            len(molecule.dihedrals) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                                molecule.atoms[molecule.angles[i][2]].symbol(),
+                                molecule.angles[i][2],
+                                molecule.atoms[molecule.angles[j][0]].symbol(),
+                                molecule.angles[j][0],
+                                molecule.atoms[molecule.angles[j][1]].symbol(),
+                                molecule.angles[j][1],
+                                molecule.atoms[molecule.angles[j][2]].symbol(),
+                                molecule.angles[j][2],
+                                list_of_dihedrals[-1]))
+                if molecule.angles[i][1] == molecule.angles[j][2] and \
+                        molecule.angles[i][0] == molecule.angles[j][1]:
+                    molecule.add_dihedral(molecule.angles[i][2],
+                                          molecule.angles[j][2],
+                                          molecule.angles[j][1],
+                                          molecule.angles[j][0])
+                    list_of_dihedrals.append(
+                        math.degrees(molecule.dihedral_angle(
+                            len(molecule.dihedrals) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                                molecule.atoms[molecule.angles[i][2]].symbol(),
+                                molecule.angles[i][2],
+                                molecule.atoms[molecule.angles[j][2]].symbol(),
+                                molecule.angles[j][2],
+                                molecule.atoms[molecule.angles[j][1]].symbol(),
+                                molecule.angles[j][1],
+                                molecule.atoms[molecule.angles[j][0]].symbol(),
+                                molecule.angles[j][0],
+                                list_of_dihedrals[-1]))
+    else:
+        if verbosity >= 2:
+            print("\nNot looking for dihedrals in WellFARe molecule: ",
+                  molecule.name)
+            print(
+                "(because there are fewer than two angles"
+                " identified in the molecule)")
+    return list_of_dihedrals
+
+
+def build_molecular_angles(molecule, verbosity=0):
+    """
+
+    :param molecule: The molecule to be operated on
+    :param verbosity: How chatty this method is.
+    :return: A list with the values of all bond angles in degrees in the same
+             order as the bond angles.
+    """
+
+    list_of_bond_angles = []
+
+    # Now that we know where the bonds are, find angles
+    if len(molecule.bonds) > 1:
+        if verbosity >= 2:
+            print("\nLooking for angles in WellFARe molecule: ", molecule.name)
+        for i in range(0, len(molecule.bonds)):
+            for j in range(i + 1, len(molecule.bonds)):
+                if molecule.bonds[i][0] == molecule.bonds[j][0]:
+                    molecule.add_angle(molecule.bonds[i][1],
+                                       molecule.bonds[i][0],
+                                       molecule.bonds[j][1])
+                    list_of_bond_angles.append(
+                        math.degrees(molecule.bond_angle(
+                            len(molecule.angles) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                                molecule.atoms[molecule.bonds[i][1]].symbol(),
+                                molecule.bonds[i][1],
+                                molecule.atoms[molecule.bonds[i][0]].symbol(),
+                                molecule.bonds[i][0],
+                                molecule.atoms[molecule.bonds[j][1]].symbol(),
+                                molecule.bonds[j][1],
+                                list_of_bond_angles[-1]))
+                if molecule.bonds[i][0] == molecule.bonds[j][1]:
+                    molecule.add_angle(molecule.bonds[i][1],
+                                       molecule.bonds[i][0],
+                                       molecule.bonds[j][0])
+                    list_of_bond_angles.append(
+                        math.degrees(molecule.bond_angle(
+                            len(molecule.angles) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                                molecule.atoms[molecule.bonds[i][1]].symbol(),
+                                molecule.bonds[i][1],
+                                molecule.atoms[molecule.bonds[i][0]].symbol(),
+                                molecule.bonds[i][0],
+                                molecule.atoms[molecule.bonds[j][0]].symbol(),
+                                molecule.bonds[j][0],
+                                list_of_bond_angles[-1]))
+                if molecule.bonds[i][1] == molecule.bonds[j][0]:
+                    molecule.add_angle(molecule.bonds[i][0],
+                                       molecule.bonds[i][1],
+                                       molecule.bonds[j][1])
+                    list_of_bond_angles.append(
+                        math.degrees(molecule.bond_angle(
+                            len(molecule.angles) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                                molecule.atoms[molecule.bonds[i][0]].symbol(),
+                                molecule.bonds[i][0],
+                                molecule.atoms[molecule.bonds[i][1]].symbol(),
+                                molecule.bonds[i][1],
+                                molecule.atoms[molecule.bonds[j][1]].symbol(),
+                                molecule.bonds[j][1],
+                                list_of_bond_angles[-1]))
+                if molecule.bonds[i][1] == molecule.bonds[j][1]:
+                    molecule.add_angle(molecule.bonds[i][0],
+                                       molecule.bonds[i][1],
+                                       molecule.bonds[j][0])
+                    list_of_bond_angles.append(
+                        math.degrees(molecule.bond_angle(
+                            len(molecule.angles) - 1)))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}), {:<3} ({:3d})"
+                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                                molecule.atoms[molecule.bonds[i][0]].symbol(),
+                                molecule.bonds[i][0],
+                                molecule.atoms[molecule.bonds[i][1]].symbol(),
+                                molecule.bonds[i][1],
+                                molecule.atoms[molecule.bonds[j][0]].symbol(),
+                                molecule.bonds[j][0],
+                                list_of_bond_angles[-1]))
+    else:
+        if verbosity >= 2:
+            print("\nNot looking for angles in WellFARe molecule: ",
+                  molecule.name)
+            print(
+                "(because there are fewer than 2 bonds"
+                " identified in the molecule)")
+    return list_of_bond_angles
+
+
+def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
+                      distfactor=1.3, deletefirst=True):
+    """
+    This method populates the list of bonds of a given molecule.
+
+    :param molecule: The molecule to operate on
+    :param bo: an n by n matrix (i.e. array) that holds qm bond orders (if not
+               available, bonds will be built from distances alone).
+    :param verbosity: How talkative this method is, default is silence.
+    :param bondcutoff: Cutoff value for the qm bond orders below which no bond
+                       will be assigned between two atoms.
+    :param distfactor: Cutoff value for a multiple of the sum of covalent radii
+                       above which no bond will be assigned between two atoms.
+    :param deletefirst: Should the list of bonds be deleted, before a new list
+                        is built?
+    :return: A list of all bond lengths in Å in the same order as the bonds.
+    """
+
+    if bo is None:
+        bo = []
+    list_of_bond_lengths = []
+
+    if deletefirst is True:
+        molecule.bonds = []
+
+    # Test if we actually have Quantum Mechanical (qm) Bond orders
+    if np.count_nonzero(bo) != 0 and molecule.num_atoms() != 1:
+        if verbosity >= 2:
+            print("\nLooking for bonds in WellFARe molecule: ", molecule.name)
+            print("(using bond orders with a cutoff of {: .2f}):".format(
+                bondcutoff))
+        for i in range(0, molecule.num_atoms()):
+            for j in range(i + 1, molecule.num_atoms()):
+                if bo[i][j] >= bondcutoff:
+                    molecule.add_bond(i, j)
+                    list_of_bond_lengths.append(molecule.atm_atm_dist(i, j))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:4d}) and {:<3} ({:4d})"
+                            " (Bond order: {: 6.3f}, length {:6.3f} Å)".format(
+                                molecule.atoms[i].symbol(), i,
+                                molecule.atoms[j].symbol(), j,
+                                float(bo[i][j]), list_of_bond_lengths[-1]))
+    # Else use 130% of the sum of covalent radii as criterion for a bond (user
+    # defined: distfactor)
+    elif molecule.num_atoms() != 1:
+        if verbosity >= 2:
+            print("\nLooking for bonds in WellFARe molecule:", molecule.name)
+            print(
+                "(using covalent radii scaled by {: .2f}):".format(distfactor))
+        for i in range(0, molecule.num_atoms()):
+            for j in range(i + 1, molecule.num_atoms()):
+                if molecule.atm_atm_dist(i, j) <= (
+                        SymbolToRadius[molecule.atoms[i].symbol()] +
+                        SymbolToRadius[
+                            molecule.atoms[j].symbol()]) * distfactor:
+                    molecule.add_bond(i, j)
+                    list_of_bond_lengths.append(molecule.atm_atm_dist(i, j))
+                    if verbosity >= 3:
+                        print(
+                            " {:<3} ({:3d}) and {:<3} ({:3d})"
+                            " (Distance: {:.3f} Å)".format(
+                                molecule.atoms[i].symbol(), i,
+                                molecule.atoms[j].symbol(), j,
+                                list_of_bond_lengths[-1]))
+    else:
+        if verbosity >= 2:
+            print("\nNot looking for bonds in WellFARe molecule:",
+                  molecule.name)
+            print("(because we only have one atom)")
+    return list_of_bond_lengths
 
 
 def main():
@@ -1220,8 +813,7 @@ def main():
     example.add_atom(Atom("H", x=-0.27729844, y=1.07856086, z=-0.87365150))
     example.add_atom(
         Atom("H", x=-1.70397128, y=0.57417585, z=0.00000000, mass=2.0))
-    print(example.print_mol(output = "gauss"))
-
+    print(example.print_mol(output="gauss"))
 
 
 if __name__ == '__main__':

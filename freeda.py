@@ -1,9 +1,9 @@
 
-################################################################################
-#                                                                              #
-# This is the part of the program where the vibrational analysis is done       #
-#                                                                              #
-################################################################################
+###############################################################################
+#                                                                             #
+# This is the part of the program where the vibrational analysis is done      #
+#                                                                             #
+###############################################################################
 
 def thermochemicalAnalysis(molecule, temp=298.15, press=101325.0, scalefreq=1.0, verbosity=0):
     # Constants
@@ -331,7 +331,6 @@ def thermochemicalAnalysis(molecule, temp=298.15, press=101325.0, scalefreq=1.0,
             print("  Total entropy:                                     {:> 12.2f} J mol⁻¹ K⁻¹".format(Stot))
             print(" Total entropic contribution to the Gibbs energy (-TS)   {:> 12.6f} h\n".format(molecule.negTS))
         print(" Total Gibbs energy (G = H - TS)                         {:> 12.6f} h\n".format(Gtot))
-
 
 
 ################################################################################

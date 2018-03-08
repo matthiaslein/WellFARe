@@ -1,104 +1,12 @@
 import sys
 import os.path
 import time
-
-
-def timestamp(s):
-    print(s + time.strftime("%Y/%m/%d %X"))
-
-
-# ASCII FONTS from: http://patorjk.com/software/taag/
-# Font = "Small"
-def ProgramHeader():
-    print("###############################################################################")
-    print("Wellington Fast Assessment of Reactions - Spectroscopical Data Plot")
-    print("  __      __   _ _ ___ _   ___     ___              ___ _     _    ")
-    print("  \ \    / /__| | | __/_\ | _ \___/ __|_ __  ___ __| _ \ |___| |_  ")
-    print("   \ \/\/ / -_) | | _/ _ \|   / -_)__ \ '_ \/ -_) _|  _/ / _ \  _| ")
-    print("    \_/\_/\___|_|_|_/_/ \_\_|_\___|___/ .__/\___\__|_| |_\___/\__| ")
-    print("                                      |_|                          ")
-    print("                                                        Version 0.9")
-    print("         WellFAReSpecPlot Copyright (C) 2015 Matthias Lein         ")
-    print("          This program comes with ABSOLUTELY NO WARRANTY           ")
-    print("           This is free software, and you are welcome to           ")
-    print("             redistribute it under certain conditions.             ")
-    timestamp('Program started at: ')
-    print("###############################################################################\n")
-
-
-def ProgramFooter():
-    print("\n###############################################################################")
-    print("  ___                                ___         _    ")
-    print(" | _ \_ _ ___  __ _ _ _ __ _ _ __   | __|_ _  __| |___")
-    print(" |  _/ '_/ _ \/ _` | '_/ _` | '  \  | _|| ' \/ _` (_-<")
-    print(" |_| |_| \___/\__, |_| \__,_|_|_|_| |___|_||_\__,_/__/")
-    print("              |___/                                   ")
-    timestamp('Program terminated at: ')
-    print("###############################################################################")
-
-
-def ProgramAbort():
-    print("\n###############################################################################")
-    print("  ___                  _             _          _ ")
-    print(" | _ \_  _ _ _    __ _| |__  ___ _ _| |_ ___ __| |")
-    print(" |   / || | ' \  / _` | '_ \/ _ \ '_|  _/ -_) _` |")
-    print(" |_|_\\\_,_|_||_| \__,_|_.__/\___/_|  \__\___\__,_|")
-    timestamp('Program aborted at: ')
-    print("###############################################################################")
-    sys.exit()
-    return
-
-
-def ProgramWarning(warntext=''):
-    print("\n###############################################################################")
-    print(" __      __             _           ")
-    print(" \ \    / /_ _ _ _ _ _ (_)_ _  __ _ ")
-    print("  \ \/\/ / _` | '_| ' \| | ' \/ _` |")
-    print("   \_/\_/\__,_|_| |_||_|_|_||_\__, |")
-    print("                              |___/ ")
-    timestamp('Warning time/date: ')
-    if warntext != '':
-        print("###############################################################################")
-        print("# ", warntext)
-    print("###############################################################################\n")
-    return
-
-
-def ProgramError(errortext=''):
-    print("\n###############################################################################")
-    print("  ___                 ")
-    print(" | __|_ _ _ _ ___ _ _ ")
-    print(" | _|| '_| '_/ _ \ '_|")
-    print(" |___|_| |_| \___/_|  ")
-    timestamp('Error time/date: ')
-    if errortext != '':
-        print("###############################################################################")
-        print("# ", errortext)
-    print("###############################################################################")
-    return
-
-
-# Check for numpy and matplotlib, try to exit gracefully if not found
-import imp
-
-try:
-    imp.find_module('numpy')
-    foundnp = True
-except ImportError:
-    foundnp = False
-try:
-    imp.find_module('matplotlib')
-    foundplot = True
-except ImportError:
-    foundplot = False
-if not foundnp:
-    ProgramError("Numpy is required. Exiting")
-    ProgramAbort()
-if not foundplot:
-    ProgramError("Matplotlib is required. Exiting")
-    ProgramAbort()
 import numpy as np
 import matplotlib.pyplot as plt
+
+from messages import *
+
+
 
 
 def extractExcitations(filename):
@@ -109,7 +17,7 @@ def extractExcitations(filename):
     try:
         f = open(filename, 'r')
     except:
-        ProgramWarning("Can't open file {}".format(filename))
+        msg_program_warning("Can't open file {}".format(filename))
         return bands, oscstr, gibbsfree, ecdstr
     program = "N/A"
     # Determine which QM program we're dealing with
@@ -132,7 +40,8 @@ def extractExcitations(filename):
     if program == "g09":
         f = open(filename, 'r')
         for line in f:
-            if line.find("Excitation energies and oscillator strengths:") != -1:
+            if line.find(
+                    "Excitation energies and oscillator strengths:") != -1:
                 del excit[:]
                 while True:
                     readBuffer = f.__next__()
@@ -174,7 +83,8 @@ def extractExcitations(filename):
     elif program == "orca":
         f = open(filename, 'r')
         for line in f:
-            if line.find(" ABSORPTION SPECTRUM VIA TRANSITION ELECTRIC DIPOLE MOMENTS") != -1:
+            if line.find(
+                    " ABSORPTION SPECTRUM VIA TRANSITION ELECTRIC DIPOLE MOMENTS") != -1:
                 del excit[:]
                 for i in range(0, 4):
                     readBuffer = f.__next__()
@@ -242,13 +152,15 @@ def findmax(listoflists):
 # Gaussian curves are often a better fit for UV/Vis.
 def gaussBand(x, band, strength, stdev):
     "Produces a Gaussian curve"
-    bandshape = 1.3062974e8 * (strength / (1e7 / stdev)) * np.exp(-(((1.0 / x) - (1.0 / band)) / (1.0 / stdev)) ** 2)
+    bandshape = 1.3062974e8 * (strength / (1e7 / stdev)) * np.exp(
+        -(((1.0 / x) - (1.0 / band)) / (1.0 / stdev)) ** 2)
     return bandshape
 
 
 def lorentzBand(x, band, strength, stdev, gamma):
     "Produces a Lorentzian curve"
-    bandshape = 1.3062974e8 * (strength / (1e7 / stdev)) * ((gamma ** 2) / ((x - band) ** 2 + gamma ** 2))
+    bandshape = 1.3062974e8 * (strength / (1e7 / stdev)) * (
+                (gamma ** 2) / ((x - band) ** 2 + gamma ** 2))
     return bandshape
 
 
@@ -258,31 +170,52 @@ import argparse
 parser = argparse.ArgumentParser(
     description="WellFAReSpecPlot: Wellington Fast Assessment of Reactions - Spectral Data Plot",
     epilog="recognised filetypes: g09, orca")
-parser.add_argument("files", metavar='file', help="input file(s) with spectroscopic data", nargs='+',
+parser.add_argument("files", metavar='file',
+                    help="input file(s) with spectroscopic data", nargs='+',
                     default="reactant.log")
-parser.add_argument("-c", "--cutoff", help="cutoff value for inclusion into plots",
+parser.add_argument("-c", "--cutoff",
+                    help="cutoff value for inclusion into plots",
                     default=0.01,
                     type=float)
-parser.add_argument("-u", "--upper", help="highest frequency (in nm) for the plot", type=float)
-parser.add_argument("-l", "--lower", help="lowest frequency (in nm) for the plot", type=float)
-parser.add_argument("-b", "--broadening", help="line broadening (in nm)", type=float, default=3099.6)
-parser.add_argument("--hwhm", help="half width at half peak height (only for Lorentzians; in nm)", type=float,
+parser.add_argument("-u", "--upper",
+                    help="highest frequency (in nm) for the plot", type=float)
+parser.add_argument("-l", "--lower",
+                    help="lowest frequency (in nm) for the plot", type=float)
+parser.add_argument("-b", "--broadening", help="line broadening (in nm)",
+                    type=float, default=3099.6)
+parser.add_argument("--hwhm",
+                    help="half width at half peak height (only for Lorentzians; in nm)",
+                    type=float,
                     default=7.5)
-parser.add_argument("--nolines", help="prevent printing of line spectra underneath plots", action='store_true')
-parser.add_argument("--nonames", help="prevent printing of file names in plots", action='store_true', default=False)
-parser.add_argument("--nocontr", help="prevent printing of contributions in plots", action='store_true', default=False)
-parser.add_argument("-t", "--totalonly", help="only print the total plot, not individual subplots", action='store_true')
-parser.add_argument("--flipecd", help="invert the handedness of the ECD data", action='store_true')
-parser.add_argument("-f", "--function", help="type of function to fit spectrum", choices=["gaussian", "lorentzian"],
+parser.add_argument("--nolines",
+                    help="prevent printing of line spectra underneath plots",
+                    action='store_true')
+parser.add_argument("--nonames",
+                    help="prevent printing of file names in plots",
+                    action='store_true', default=False)
+parser.add_argument("--nocontr",
+                    help="prevent printing of contributions in plots",
+                    action='store_true', default=False)
+parser.add_argument("-t", "--totalonly",
+                    help="only print the total plot, not individual subplots",
+                    action='store_true')
+parser.add_argument("--flipecd", help="invert the handedness of the ECD data",
+                    action='store_true')
+parser.add_argument("-f", "--function",
+                    help="type of function to fit spectrum",
+                    choices=["gaussian", "lorentzian"],
                     default="gaussian")
-parser.add_argument("-p", "--points", help="number of points to plot", type=float)
-parser.add_argument("--colourmap", help="choose colour map for the plot", type=int, choices=[0, 1, 2, 3], default=0)
-parser.add_argument("-v", "--verbosity", help="increase output verbosity", type=int, choices=[0, 1, 2, 3], default=1)
+parser.add_argument("-p", "--points", help="number of points to plot",
+                    type=float)
+parser.add_argument("--colourmap", help="choose colour map for the plot",
+                    type=int, choices=[0, 1, 2, 3], default=0)
+parser.add_argument("-v", "--verbosity", help="increase output verbosity",
+                    type=int, choices=[0, 1, 2, 3], default=1)
 
 args = parser.parse_args()
 
 if args.verbosity >= 2:
-    ProgramHeader()
+    msg_program_header("SpecPlot - Spectroscopical Data Plot", 1.0)
 
 # Create empty lists for energies, bands and osc strengths
 energies = []
@@ -299,11 +232,14 @@ for i in range(0, len(args.files)):
             print("Reading from file {} now.".format(args.files[i]))
         band, f, energy, ecd = extractExcitations(args.files[i])
         if band == [] or f == [] or ecd == []:
-            ProgramWarning("No spectral data found in {}".format(args.files[i]))
+            msg_program_warning(
+                "No spectral data found in {}".format(args.files[i]))
         elif energy == []:
-            ProgramWarning("No thermodynamic data (Gibbs free energy) found in this file!")
+            msg_program_warning(
+                "No thermodynamic data (Gibbs free energy) found in this file!")
         elif len(band) != len(f) or len(band) != len(ecd):
-            ProgramWarning("Inconsistency with # of bands and # of osc strengths/ecd in this file!")
+            msg_program_warning(
+                "Inconsistency with # of bands and # of osc strengths/ecd in this file!")
         else:
             names.append(args.files[i])
             bands.append(band)
@@ -311,7 +247,8 @@ for i in range(0, len(args.files)):
             ecds.append(ecd)
             energies = energies + [energy]
     else:
-        ProgramWarning("The file {} doesn't exist or is not a file".format(args.files[i]))
+        msg_program_warning(
+            "The file {} doesn't exist or is not a file".format(args.files[i]))
 
 if len(energies) > 1:
     # Convert absolute energies into relative energies
@@ -326,9 +263,7 @@ else:
     if len(energies) == 1:
         boltzmann = np.ones(len(energies))
     else:
-        ProgramError("No spectral data for plotting")
-        ProgramAbort()
-
+        msg_program_error("No spectral data for plotting")
 
 # Initialise a stdev array for the peak broadening
 # A sqrt(2) * standard deviation of 0.4 eV is 3099.6 nm. 0.1 eV is 12398.4 nm. 0.2 eV is 6199.2 nm.
@@ -336,7 +271,6 @@ stdevs = np.full([len(energies), len(bands[0])], args.broadening)
 
 # For Lorentzians, gamma is half bandwidth at half peak height (nm)
 gammas = np.full([len(energies), len(bands[0])], args.hwhm)
-
 
 # Find out how many structures actually contribute significantly to the UV-Vis
 sigstruct = 0
@@ -354,7 +288,8 @@ if args.flipecd == True:
 # Go through all significant structures again and check if they have an ECD spectrum
 ecd_sigstruct = 0
 for count, i in enumerate(np.argsort(energies)):
-    if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(np.absolute(ecds[i])) > 0.0:
+    if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(
+            np.absolute(ecds[i])) > 0.0:
         ecd_sigstruct += 1
 
 # Now that we know the bands, setup plot
@@ -379,39 +314,53 @@ if args.verbosity >= 2:
         print("Data from file no {}: {}".format(i, names[i - 1]))
         print("Relative Gibbs energy: {:.3f}".format(energies[i - 1]))
         print("Boltzmann factor: {:.3f}".format(boltzmann[i - 1]))
-        print("Contribution: {:.1f}%".format((boltzmann[i - 1] / np.sum(boltzmann)) * 100))
+        print("Contribution: {:.1f}%".format(
+            (boltzmann[i - 1] / np.sum(boltzmann)) * 100))
         if args.verbosity >= 3:
             print("  nm     UV-Vis     ECD")
             for j in range(0, len(bands[i - 1])):
-                print(" {:.1f}  {:7.5f} {:-10.5f}".format(bands[i - 1][j], strengths[i - 1][j], ecds[i - 1][j]))
+                print(" {:.1f}  {:7.5f} {:-10.5f}".format(bands[i - 1][j],
+                                                          strengths[i - 1][j],
+                                                          ecds[i - 1][j]))
         print("")
 if args.verbosity >= 1:
     print("Examined {} file(s)".format(len(args.files)))
     print("Found spectral data in {} file(s)".format(len(bands)))
 if args.verbosity >= 2:
     if args.function == "lorentzian":
-        print("Using Lorentzians with a line broadening of {:.1f} nm and a HWHM of {:.1f} nm for plotting".format(
-            args.broadening, args.hwhm))
+        print(
+            "Using Lorentzians with a line broadening of {:.1f} nm and a HWHM of {:.1f} nm for plotting".format(
+                args.broadening, args.hwhm))
     else:
-        print("Using Gaussians with a line broadening of {:.1f} nm for plotting".format(args.broadening))
+        print(
+            "Using Gaussians with a line broadening of {:.1f} nm for plotting".format(
+                args.broadening))
     if args.totalonly == True:
         print("Only plotting overall UV-Vis plot")
     else:
-        print("Plotting {} structure(s) that contribute to >{:.1f}% to the UV-Vis spectrum".format(sigstruct,
-                                                                                                   args.cutoff * 100))
+        print(
+            "Plotting {} structure(s) that contribute to >{:.1f}% to the UV-Vis spectrum".format(
+                sigstruct,
+                args.cutoff * 100))
     if ecd_sigstruct > 0 and args.totalonly == False:
-        print("Plotting {} contributing structure(s) with ECD data".format(ecd_sigstruct))
+        print("Plotting {} contributing structure(s) with ECD data".format(
+            ecd_sigstruct))
     if ecd_sigstruct > 0 and args.totalonly == True:
-        print("Only plotting overall ECD plot. {} structures with significant ECD data.".format(ecd_sigstruct))
+        print(
+            "Only plotting overall ECD plot. {} structures with significant ECD data.".format(
+                ecd_sigstruct))
     else:
         if args.verbosity >= 3:
-            print("No ECD spectra available or no significant contribution to the spectrum")
+            print(
+                "No ECD spectra available or no significant contribution to the spectrum")
     if ecd_sigstruct > 0 and args.flipecd == True:
         print("The ECD data has been inverted (to show the other enantiomer)")
 
     if args.verbosity >= 3 and sigstruct > 1:
-        print("Note that the overall UV-Vis and ECD spectra *always* contain *all* contributions.")
-    print("Plotting data from {} nm to {} nm ({} points)".format(start, finish, points))
+        print(
+            "Note that the overall UV-Vis and ECD spectra *always* contain *all* contributions.")
+    print("Plotting data from {} nm to {} nm ({} points)".format(start, finish,
+                                                                 points))
     print("")
 
 # Calculate composite spectrum and individual spectra for all UV-Vis data
@@ -421,10 +370,25 @@ for i in range(0, len(bands)):
     individual.append(0)
     for count, peak in enumerate(bands[i]):
         if args.function == "lorentzian":
-            thispeak = (boltzmann[i] / np.sum(boltzmann)) * lorentzBand(x, peak, strengths[i][count], stdevs[i][count],
-                                                                        gammas[i][count])
+            thispeak = (boltzmann[i] / np.sum(boltzmann)) * lorentzBand(x,
+                                                                        peak,
+                                                                        strengths[
+                                                                            i][
+                                                                            count],
+                                                                        stdevs[
+                                                                            i][
+                                                                            count],
+                                                                        gammas[
+                                                                            i][
+                                                                            count])
         else:
-            thispeak = (boltzmann[i] / np.sum(boltzmann)) * gaussBand(x, peak, strengths[i][count], stdevs[i][count])
+            thispeak = (boltzmann[i] / np.sum(boltzmann)) * gaussBand(x, peak,
+                                                                      strengths[
+                                                                          i][
+                                                                          count],
+                                                                      stdevs[
+                                                                          i][
+                                                                          count])
         composite += thispeak
         individual[i] += thispeak
 
@@ -435,10 +399,24 @@ for i in range(0, len(bands)):
     individual_ecd.append(0)
     for count, peak in enumerate(bands[i]):
         if args.function == "lorentzian":
-            thispeak = (boltzmann[i] / np.sum(boltzmann)) * lorentzBand(x, peak, ecds[i][count], stdevs[i][count],
-                                                                        gammas[i][count])
+            thispeak = (boltzmann[i] / np.sum(boltzmann)) * lorentzBand(x,
+                                                                        peak,
+                                                                        ecds[
+                                                                            i][
+                                                                            count],
+                                                                        stdevs[
+                                                                            i][
+                                                                            count],
+                                                                        gammas[
+                                                                            i][
+                                                                            count])
         else:
-            thispeak = (boltzmann[i] / np.sum(boltzmann)) * gaussBand(x, peak, ecds[i][count], stdevs[i][count])
+            thispeak = (boltzmann[i] / np.sum(boltzmann)) * gaussBand(x, peak,
+                                                                      ecds[i][
+                                                                          count],
+                                                                      stdevs[
+                                                                          i][
+                                                                          count])
         composite_ecd += thispeak
         individual_ecd[i] += thispeak
 
@@ -459,11 +437,13 @@ if sigstruct == 1:
     stretchfactor = 1 / max(strengths[0])
     if args.nolines != True:
         for j in range(0, len(bands[0])):
-            ax.vlines(bands[0][j], 0.0, ax.get_ylim()[1] * stretchfactor * strengths[0][j])
+            ax.vlines(bands[0][j], 0.0,
+                      ax.get_ylim()[1] * stretchfactor * strengths[0][j])
     if args.nonames != True:
         ax.text(0.8, 0.8,
                 '{}'.format(names[0]),
-                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                horizontalalignment='center', verticalalignment='center',
+                transform=ax.transAxes)
     plt.xlabel('$\lambda$ / nm')
     plt.ylabel('$\epsilon$ / L mol$^{-1}$ cm$^{-1}$')
 elif args.totalonly == True:
@@ -490,19 +470,26 @@ else:
             ax[count + 1].axis(ymin=0.0)
             if args.nonames == False and args.nocontr == False:
                 ax[count + 1].text(0.8, 0.5,
-                                   '{}\n Contribution: {:.1f}%'.format(names[i],
-                                                                       (boltzmann[i] / np.sum(boltzmann)) * 100),
-                                   horizontalalignment='center', verticalalignment='center',
+                                   '{}\n Contribution: {:.1f}%'.format(
+                                       names[i],
+                                       (boltzmann[i] / np.sum(
+                                           boltzmann)) * 100),
+                                   horizontalalignment='center',
+                                   verticalalignment='center',
                                    transform=ax[count + 1].transAxes)
             elif args.nonames == True and args.nocontr == False:
                 ax[count + 1].text(0.8, 0.5,
-                                   'Contribution: {:.1f}%'.format((boltzmann[i] / np.sum(boltzmann)) * 100),
-                                   horizontalalignment='center', verticalalignment='center',
+                                   'Contribution: {:.1f}%'.format((boltzmann[
+                                                                       i] / np.sum(
+                                       boltzmann)) * 100),
+                                   horizontalalignment='center',
+                                   verticalalignment='center',
                                    transform=ax[count + 1].transAxes)
             elif args.nonames == False and args.nocontr == True:
                 ax[count + 1].text(0.8, 0.5,
                                    '{}'.format(names[i]),
-                                   horizontalalignment='center', verticalalignment='center',
+                                   horizontalalignment='center',
+                                   verticalalignment='center',
                                    transform=ax[count + 1].transAxes)
             # print("Strongest transition in structure {}: {}".format(i,max(strengths[i])))
             stretchfactor = 1 / max(strengths[i])
@@ -510,12 +497,15 @@ else:
                 for j in range(0, len(bands[0])):
                     # Print vertical line spectrum scaled to 90% of the size of the y-axis (ax[count+1].get_ylim()[1])
                     ax[count + 1].vlines(bands[i][j], 0.0,
-                                         0.9 * ax[count + 1].get_ylim()[1] * stretchfactor * strengths[i][j])
+                                         0.9 * ax[count + 1].get_ylim()[
+                                             1] * stretchfactor * strengths[i][
+                                             j])
                     # print("Plotting band of molecule {} at: {}".format(i,bands[i][j]))
         ax[0].plot(x, individual[i], color=colourmap[i], linestyle='--')
     if args.nocontr == False:
-        ax[0].text(0.8, 0.5, 'All contributions', horizontalalignment='center', verticalalignment='center',
-               transform=ax[0].transAxes)
+        ax[0].text(0.8, 0.5, 'All contributions', horizontalalignment='center',
+                   verticalalignment='center',
+                   transform=ax[0].transAxes)
     plt.xlabel('$\lambda$ / nm')
     plt.ylabel('$\epsilon$ / L mol$^{-1}$ cm$^{-1}$')
 
@@ -523,7 +513,8 @@ else:
 if ecd_sigstruct == 1:
     # find out which structure it is that is contributing
     for count, i in enumerate(np.argsort(energies)):
-        if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(np.absolute(ecds[i])) > 0.0:
+        if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(
+                np.absolute(ecds[i])) > 0.0:
             ecd_struct = i
     fig, ay = plt.subplots(nrows=1, sharex=True, sharey=False)
     ay.plot(x, composite_ecd)
@@ -532,26 +523,33 @@ if ecd_sigstruct == 1:
         if args.nonames == False and args.nocontr == False:
             ay.text(0.8, 0.8,
                     '{}\n Contribution: {:.1f}%'.format(names[ecd_struct],
-                                                        (boltzmann[ecd_struct] / np.sum(boltzmann)) * 100),
-                    horizontalalignment='center', verticalalignment='center', transform=ay.transAxes)
+                                                        (boltzmann[
+                                                             ecd_struct] / np.sum(
+                                                            boltzmann)) * 100),
+                    horizontalalignment='center', verticalalignment='center',
+                    transform=ay.transAxes)
         elif args.nonames == True and args.nocontr == False:
             ay.text(0.8, 0.8,
                     'Contribution: {:.1f}%'.format(
                         (boltzmann[ecd_struct] / np.sum(boltzmann)) * 100),
-                    horizontalalignment='center', verticalalignment='center', transform=ay.transAxes)
+                    horizontalalignment='center', verticalalignment='center',
+                    transform=ay.transAxes)
         elif args.nonames == False and args.nocontr == True:
             ay.text(0.8, 0.8,
                     '{}'.format(names[ecd_struct]),
-                    horizontalalignment='center', verticalalignment='center', transform=ay.transAxes)
+                    horizontalalignment='center', verticalalignment='center',
+                    transform=ay.transAxes)
     else:
         if args.nonames == False:
             ay.text(0.8, 0.8,
                     '{}'.format(names[ecd_struct]),
-                    horizontalalignment='center', verticalalignment='center', transform=ay.transAxes)
+                    horizontalalignment='center', verticalalignment='center',
+                    transform=ay.transAxes)
     stretchfactor = 1 / max(ecds[ecd_struct])
     if args.nolines != True:
         for j in range(0, len(bands[ecd_struct])):
-            ay.vlines(bands[ecd_struct][j], 0.0, ay.get_ylim()[1] * stretchfactor * ecds[ecd_struct][j])
+            ay.vlines(bands[ecd_struct][j], 0.0,
+                      ay.get_ylim()[1] * stretchfactor * ecds[ecd_struct][j])
     ay.set_title("ECD")
     plt.xlabel('$\lambda$ / nm')
     plt.ylabel('intensity / arbitrary units')
@@ -562,7 +560,8 @@ elif args.totalonly == True:
     ay.axhline()
     # find out which structure it is that is contributing
     for count, i in enumerate(np.argsort(energies)):
-        if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(np.absolute(ecds[i])) > 0.0:
+        if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(
+                np.absolute(ecds[i])) > 0.0:
             ay.plot(x, individual_ecd[i], color=colourmap[i], linestyle='--')
     ay.set_title("ECD")
     plt.xlabel('$\lambda$ / nm')
@@ -574,21 +573,30 @@ elif ecd_sigstruct > 1:
     ay[0].axhline()
     countpanels = 1
     for count, i in enumerate(np.argsort(energies)):
-        if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(np.absolute(ecds[i])) > 0.0:
+        if (boltzmann[i] / np.sum(boltzmann)) > args.cutoff and max(
+                np.absolute(ecds[i])) > 0.0:
             ay[countpanels].plot(x, individual_ecd[i], color=colourmap[i])
             ay[countpanels].axhline()
             if args.nonames == False and args.nocontr == False:
-                ay[countpanels].text(0.8, 0.8, '{}\n Contribution: {:.1f}%'.format(names[i], (
-                    boltzmann[i] / np.sum(boltzmann)) * 100), horizontalalignment='center', verticalalignment='center',
+                ay[countpanels].text(0.8, 0.8,
+                                     '{}\n Contribution: {:.1f}%'.format(
+                                         names[i], (
+                                                 boltzmann[i] / np.sum(
+                                             boltzmann)) * 100),
+                                     horizontalalignment='center',
+                                     verticalalignment='center',
                                      transform=ay[countpanels].transAxes)
             elif args.nonames == True and args.nocontr == False:
                 ay[countpanels].text(0.8, 0.8, 'Contribution: {:.1f}%'.format((
-                                                                                  boltzmann[i] / np.sum(
-                                                                                      boltzmann)) * 100),
-                                     horizontalalignment='center', verticalalignment='center',
+                                                                                      boltzmann[
+                                                                                          i] / np.sum(
+                                                                                  boltzmann)) * 100),
+                                     horizontalalignment='center',
+                                     verticalalignment='center',
                                      transform=ay[countpanels].transAxes)
             elif args.nonames == False and args.nocontr == True:
-                ay[countpanels].text(0.8, 0.8, '{}'.format(names[i]), horizontalalignment='center',
+                ay[countpanels].text(0.8, 0.8, '{}'.format(names[i]),
+                                     horizontalalignment='center',
                                      verticalalignment='center',
                                      transform=ay[countpanels].transAxes)
             if args.nolines != True:
@@ -597,17 +605,24 @@ elif ecd_sigstruct > 1:
                     # Print vertical line spectrum scaled to 90% of the size of the y-axis (ax[count+1].get_ylim()[1])
                     if ecds[i][j] > 0.0:
                         ay[countpanels].vlines(bands[i][j], 0.0,
-                                               0.9 * ay[countpanels].get_ylim()[1] * stretchfactor * ecds[i][j])
+                                               0.9 *
+                                               ay[countpanels].get_ylim()[
+                                                   1] * stretchfactor *
+                                               ecds[i][j])
                     if ecds[i][j] < 0.0:
                         ay[countpanels].vlines(bands[i][j], 0.0,
-                                               -0.9 * ay[countpanels].get_ylim()[0] * stretchfactor * ecds[i][
+                                               -0.9 *
+                                               ay[countpanels].get_ylim()[
+                                                   0] * stretchfactor *
+                                               ecds[i][
                                                    j])
                         # print("Plotting band of molecule {} at: {}".format(i,bands[i][j]))
             countpanels += 1
         ay[0].plot(x, individual_ecd[i], color=colourmap[i], linestyle='--')
     if args.nocontr == False:
-        ay[0].text(0.8, 0.8, 'All contributions', horizontalalignment='center', verticalalignment='center',
-               transform=ay[0].transAxes)
+        ay[0].text(0.8, 0.8, 'All contributions', horizontalalignment='center',
+                   verticalalignment='center',
+                   transform=ay[0].transAxes)
     ay[0].set_title("ECD")
     plt.xlabel('$\lambda$ / nm')
     plt.ylabel('intensity / arbitrary units')
@@ -615,4 +630,4 @@ elif ecd_sigstruct > 1:
 plt.show()
 
 if args.verbosity >= 2:
-    ProgramFooter()
+    msg_program_footer()
