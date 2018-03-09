@@ -142,9 +142,8 @@ def read_xyz_coord(filename, molecule, verbosity=0):
             if mark_for_delete == 1:
                 del geom[:]
                 mark_for_delete = 0
-            if is_atom_symbol(read_buffer[0]) and is_float(
-                    read_buffer[1]) and is_float(read_buffer[2])\
-                    and is_float(read_buffer[3]):
+            if is_atom_symbol(read_buffer[0]) and is_float(read_buffer[1])\
+                    and is_float(read_buffer[2]) and is_float(read_buffer[3]):
                 geom.append(read_buffer)
                 if verbosity >= 3:
                     if len(geom) == 1:

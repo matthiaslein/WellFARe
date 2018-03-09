@@ -38,8 +38,7 @@ def is_float(s):
 # Test if the argument is (can be converted to)
 # an atomic symbol
 def is_atom_symbol(s):
-    try:
-        s = SymbolToNumber[s]
+    if s in SymbolToNumber:
         return True
-    except KeyError:
+    else:
         return False
