@@ -7,7 +7,7 @@ import math
 import numpy as np
 
 from atom import Atom
-from constants import SymbolToMass, SymbolToRadius
+from constants import symbol_to_mass, symbol_to_covalent_radius
 from messages import *
 
 
@@ -38,6 +38,7 @@ class Molecule:
         self.bonds = []  # Initially an empty list
         self.angles = []  # Initially an empty list
         self.dihedrals = []  # Initially an empty list
+        self.qm_energy = 0.0  # Initially set to zero
 
     def __str__(self) -> str:
         """
@@ -488,7 +489,7 @@ class Molecule:
             s = "\n" + commentline + "\n\n" + str(self.charge) + " " + str(
                 self.mult) + "\n"
             for i in self.atoms:
-                if i.mass == SymbolToMass[i.symbol()]:
+                if i.mass == symbol_to_mass[i.symbol()]:
                     t = "{:<3} {: 13.8f} {: 13.8f} {: 13.8f}\n".format(
                         i.symbol(),
                         i.xpos(),
@@ -784,8 +785,8 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
         for i in range(0, molecule.num_atoms()):
             for j in range(i + 1, molecule.num_atoms()):
                 if molecule.atm_atm_dist(i, j) <= (
-                        SymbolToRadius[molecule.atoms[i].symbol()] +
-                        SymbolToRadius[
+                        symbol_to_covalent_radius[molecule.atoms[i].symbol()] +
+                        symbol_to_covalent_radius[
                             molecule.atoms[j].symbol()]) * distfactor:
                     molecule.add_bond(i, j)
                     list_of_bond_lengths.append(molecule.atm_atm_dist(i, j))

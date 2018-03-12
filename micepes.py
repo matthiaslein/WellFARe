@@ -14,7 +14,7 @@ from messages import *
 from atom import Atom
 from molecule import Molecule
 from qmparser import extract_molecular_data
-from constants import SymbolToRadius
+from constants import symbol_to_covalent_radius
 
 
 def build_rotation_matrix(axis, angle):
@@ -78,24 +78,27 @@ def replace_h_with_tetrahedral(molecule, h, replacement="C", add_h=3,
             return
     position = -1
     for i in new_mol.bonds:
-        if i[0] == h and position == -1:
+        if i[0] == h and position == -1 and new_mol.atm_symbol(i[1]) != "H":
             position = i[1]
-        elif i[1] == h and position == -1:
+        elif i[1] == h and position == -1 and new_mol.atm_symbol(i[0]) != "H":
             position = i[0]
         elif i[0] == h and position != -1:
-            msg_program_warning("This hydrogen atom has more "
-                                "than one bond!")
+            msg_program_warning(
+                "{}: This hydrogen atom has more than one bond!".format(
+                    new_mol.name))
             position = i[1]
             if ignore_warning is False:
                 return
         elif i[1] == h and position != -1:
-            msg_program_warning("This hydrogen atom has more "
-                                "than one bond!")
+            msg_program_warning(
+                "{}: This hydrogen atom has more than one bond!".format(
+                    new_mol.name))
             position = i[0]
             if ignore_warning is False:
                 return
     if position == -1:
-        msg_program_warning("This hydrogen atom has no bond!")
+        msg_program_warning(
+            "{}: This hydrogen atom has no bond!".format(new_mol.name))
         return
     # Find one more atom that is bound to the atom in "position"
     position2 = -1
@@ -105,7 +108,9 @@ def replace_h_with_tetrahedral(molecule, h, replacement="C", add_h=3,
         if i[1] == position and i[0] != h:
             position2 = i[0]
     if position2 == -1:
-        msg_program_warning("The C atom no seems to have only one bond!")
+        msg_program_warning(
+            "{}: The C atom no seems to have"
+            " only one bond!".format(new_mol.name))
         return
     # Calculate the vector from C to H, scale it and put the
     # replacement atom there
@@ -115,7 +120,8 @@ def replace_h_with_tetrahedral(molecule, h, replacement="C", add_h=3,
     # Scale this vector to the "right" length:
     # We choose 110% of the sum of vdW radii  as the length of a
     # slightly elongated bond
-    scale = (SymbolToRadius["C"] + SymbolToRadius[replacement]) * 1.1
+    scale = (symbol_to_covalent_radius["C"] + symbol_to_covalent_radius[
+        replacement]) * 1.1
     norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
     xcompo = (xcompo / norm) * scale
     ycompo = (ycompo / norm) * scale
@@ -138,7 +144,8 @@ def replace_h_with_tetrahedral(molecule, h, replacement="C", add_h=3,
         # Scale this vector to the "right" length:
         # We choose 110% of the sum of vdW radii  as the length of a
         # slightly elongated bond
-        scale = (SymbolToRadius["H"] + SymbolToRadius[replacement]) * 1.1
+        scale = (symbol_to_covalent_radius["H"] + symbol_to_covalent_radius[
+            replacement]) * 1.1
         norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
         xcompo = (xcompo / norm) * scale
         ycompo = (ycompo / norm) * scale
@@ -252,24 +259,28 @@ def replace_h_with_ethenyl(molecule, h, ignore_warning=False):
             return
     position = -1
     for i in new_mol.bonds:
-        if i[0] == h and position == -1:
+        if i[0] == h and position == -1 and new_mol.atm_symbol(i[1]) != "H":
             position = i[1]
-        elif i[1] == h and position == -1:
+        elif i[1] == h and position == -1 and new_mol.atm_symbol(i[0]) != "H":
             position = i[0]
         elif i[0] == h and position != -1:
-            msg_program_warning("This hydrogen atom has more "
-                                "than one bond!")
+            msg_program_warning(
+                "{}: This hydrogen atom has more than one bond!".format(
+                    new_mol.name))
             position = i[1]
             if ignore_warning is False:
                 return
         elif i[1] == h and position != -1:
-            msg_program_warning("This hydrogen atom has more "
-                                "than one bond!")
+            msg_program_warning(
+                "{}: This hydrogen atom has more than one bond!".format(
+                    new_mol.name))
             position = i[0]
             if ignore_warning is False:
                 return
     if position == -1:
-        msg_program_error("This hydrogen atom has no bond!")
+        msg_program_warning(
+            "{}: This hydrogen atom has no bond!".format(new_mol.name))
+        return
     # Find two more hydrogen atoms that are bound to the C
     # atom in "position"
     position2 = -1
@@ -290,7 +301,8 @@ def replace_h_with_ethenyl(molecule, h, ignore_warning=False):
                 break
     # print("The two other hydrogens are:", position2, " and ", position3)
     if position3 == -1:
-        msg_program_error("The C atom is not part of a CH₃ group!")
+        msg_program_error(
+            "{}: The C atom is not part of a CH₃ group!".format(new_mol.name))
 
     # Calculate the vector from C to H, scale it and put a new C atom there
     xcompo = new_mol.atm_pos_x(h) - new_mol.atm_pos_x(position)
@@ -436,24 +448,27 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
             return
     position = -1
     for i in new_mol.bonds:
-        if i[0] == h and position == -1:
+        if i[0] == h and position == -1 and new_mol.atm_symbol(i[1]) != "H":
             position = i[1]
-        elif i[1] == h and position == -1:
+        elif i[1] == h and position == -1 and new_mol.atm_symbol(i[0]) != "H":
             position = i[0]
         elif i[0] == h and position != -1:
-            msg_program_warning("This hydrogen atom has"
-                                " more than one bond!")
+            msg_program_warning(
+                "{}: This hydrogen atom has more than one bond!".format(
+                    new_mol.name))
             position = i[1]
             if ignore_warning is False:
                 return
         elif i[1] == h and position != -1:
-            msg_program_warning("This hydrogen atom has"
-                                " more than one bond!")
+            msg_program_warning(
+                "{}: This hydrogen atom has more than one bond!".format(
+                    new_mol.name))
             position = i[0]
             if ignore_warning is False:
                 return
     if position == -1:
-        msg_program_warning("This hydrogen atom has no bond!")
+        msg_program_warning(
+            "{}: This hydrogen atom has no bond!".format(new_mol.name))
         return
     # Find one more atom that is bound to the atom in "position"
     position2 = -1
@@ -463,7 +478,9 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
         if i[1] == position and i[0] != h:
             position2 = i[0]
     if position2 == -1:
-        msg_program_warning("The C atom no seems to have only one bond!")
+        msg_program_warning(
+            "{}: The C atom no seems to have only one bond!".format(
+                new_mol.name))
         return
     # Calculate the vector from C to H, scale it and put the
     # replacement atom there
@@ -472,7 +489,8 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
     zcompo = new_mol.atm_pos_z(h) - new_mol.atm_pos_z(position)
     # Scale this vector to the "right" length: We choose 110% of the sum
     # of vdW radii  as the length of a slightly elongated bond
-    scale = (SymbolToRadius["C"] + SymbolToRadius["C"]) * 1.1
+    scale = (symbol_to_covalent_radius["C"] + symbol_to_covalent_radius[
+        "C"]) * 1.1
     norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
     xcompo = (xcompo / norm) * scale
     ycompo = (ycompo / norm) * scale
@@ -494,7 +512,8 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
     zcompo = new_mol.atm_pos_z(position) - new_mol.atm_pos_z(new_atom)
     # Scale this vector to the "right" length: We choose 110% of the sum
     # of vdW radii  as the length of a slightly elongated bond
-    scale = (SymbolToRadius["O"] + SymbolToRadius["C"]) * 1.1
+    scale = (symbol_to_covalent_radius["O"] + symbol_to_covalent_radius[
+        "C"]) * 1.1
     norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
     xcompo = (xcompo / norm) * scale
     ycompo = (ycompo / norm) * scale
@@ -532,7 +551,8 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
     zcompo = new_mol.atm_pos_z(position) - new_mol.atm_pos_z(new_atom)
     # Scale this vector to the "right" length: We choose 110% of the sum
     # of vdW radii  as the length of a slightly elongated bond
-    scale = (SymbolToRadius["H"] + SymbolToRadius["C"]) * 1.1
+    scale = (symbol_to_covalent_radius["H"] + symbol_to_covalent_radius[
+        "C"]) * 1.1
     norm = math.sqrt(xcompo * xcompo + ycompo * ycompo + zcompo * zcompo)
     xcompo = (xcompo / norm) * scale
     ycompo = (ycompo / norm) * scale
@@ -611,7 +631,7 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
 parser = argparse.ArgumentParser(
     description="MICEPES: Method for the Incremental Construction and "
                 "Exploration of the Potential Energy Surface",
-    epilog="recognised filetypes: gaussian, orca, turbomole, xyz")
+    epilog="recognised file-types: gaussian, orca, turbomole, xyz")
 parser.add_argument("-v", "--verbosity", help="increase output verbosity",
                     type=int, choices=[0, 1, 2, 3], default=0)
 parser.add_argument("-o", "--output",
@@ -621,7 +641,7 @@ parser.add_argument("-o", "--output",
                     default="cart")
 parser.add_argument("-g", "--group", help="replacement group",
                     choices=["methyl", "ethenyl", "oh", "oh2", "nh2", "nh3",
-                             "cho", "f", "cl", "br", "i"],
+                             "cho", "f", "cl", "br", "i", "none"],
                     default="methyl")
 parser.add_argument("inputfile", metavar='file',
                     help="input file(s) with molecular structure")
@@ -650,89 +670,98 @@ def main():
 
     molecule = Molecule("Input Structure", 0)
 
-    extract_molecular_data(args.inputfile, molecule, verbosity=args.verbosity,
-                           read_coordinates=True, read_bond_orders=True,
-                           build_angles=True, build_dihedrals=True)
-
+    # No building of internal coordinates if we just want to print the
+    # structure. We'll need the energy though.
     list_of_hydrogens = []
+    if args.group == "none":
+        extract_molecular_data(args.inputfile, molecule,
+                               verbosity=args.verbosity,
+                               read_coordinates=True, read_qm_energy=True)
+    else:
+        extract_molecular_data(args.inputfile, molecule,
+                               verbosity=args.verbosity,
+                               read_coordinates=True, read_bond_orders=True,
+                               build_angles=True, build_dihedrals=True)
 
-    if args.replace is not None:
-        if args.verbosity >= 3:
-            print("\nAdding hydrogen atoms from the --replace key")
-        for i in args.replace:
-            if molecule.atoms[i - 1].symbol() == "H":
-                list_of_hydrogens.append(i)
-                if args.verbosity >= 3:
-                    print("Hydrogen atom ", i, " added to the list of "
-                                               "atoms for replacement.")
-            else:
-                msg_program_warning("Atom " + str(i) + " in the input "
-                                                       "is not hydrogen!")
-    if args.alloncarbon is not None:
-        if args.verbosity >= 3:
-            print("\nAdding hydrogen atoms from the --alloncarbon key")
-        for i in args.alloncarbon:
-            if molecule.atm_symbol(i - 1) == "C":
-                if args.verbosity >= 3:
-                    print("Adding the hydrogen atoms bonded to carbon atom ",
-                          i)
-                for j in molecule.bonds:
-                    at1 = j[0]  # First atom in the bond
-                    at2 = j[1]  # Second atom in the bond
-                    if at1 + 1 == i and molecule.atm_symbol(at2) == "H":
-                        list_of_hydrogens.append(at2 + 1)
-                        if args.verbosity >= 3:
-                            print("Hydrogen atom ", at2 + 1,
-                                  " added to the list of atoms"
-                                  " for replacement.")
-                    elif at2 + 1 == i and molecule.atm_symbol(at1) == "H":
-                        list_of_hydrogens.append(at1 + 1)
-                        if args.verbosity >= 3:
-                            print("Hydrogen atom ", at1 + 1,
-                                  " added to the list of atoms"
-                                  " for replacement.")
-            else:
-                msg_program_warning(
-                    "Atom " + str(i) + " in the input is not carbon!")
-    if args.terminal is not None:
-        if args.verbosity >= 3:
-            print("\nAdding hydrogen atoms from the --terminal key")
-        # Count backwards and add the given number of hydrogen atoms to list
-        counter = 0
-        for i in range(molecule.num_atoms(), 0, -1):
-            if counter < args.terminal and \
-                    molecule.atm_symbol(i - 1) == "H":
-                if args.verbosity >= 3:
-                    print("Hydrogen atom ", i,
-                          " added to the list of atoms for replacement.")
-                list_of_hydrogens.append(i)
-                counter += 1
-    elif args.replace is None and args.alloncarbon is None:
-        # If no instructions were given at all: default to replacing
-        # the terminal 3 hydrogens
+        if args.replace is not None:
+            if args.verbosity >= 3:
+                print("\nAdding hydrogen atoms from the --replace key")
+            for i in args.replace:
+                if molecule.atoms[i - 1].symbol() == "H":
+                    list_of_hydrogens.append(i)
+                    if args.verbosity >= 3:
+                        print("Hydrogen atom ", i, " added to the list of "
+                                                   "atoms for replacement.")
+                else:
+                    msg_program_warning("Atom " + str(i) + " in the input "
+                                                           "is not hydrogen!")
+        if args.alloncarbon is not None:
+            if args.verbosity >= 3:
+                print("\nAdding hydrogen atoms from the --alloncarbon key")
+            for i in args.alloncarbon:
+                if molecule.atm_symbol(i - 1) == "C":
+                    if args.verbosity >= 3:
+                        print("Adding the hydrogen atoms bonded"
+                              " to carbon atom ", i)
+                    for j in molecule.bonds:
+                        at1 = j[0]  # First atom in the bond
+                        at2 = j[1]  # Second atom in the bond
+                        if at1 + 1 == i and molecule.atm_symbol(at2) == "H":
+                            list_of_hydrogens.append(at2 + 1)
+                            if args.verbosity >= 3:
+                                print("Hydrogen atom ", at2 + 1,
+                                      " added to the list of atoms"
+                                      " for replacement.")
+                        elif at2 + 1 == i and molecule.atm_symbol(at1) == "H":
+                            list_of_hydrogens.append(at1 + 1)
+                            if args.verbosity >= 3:
+                                print("Hydrogen atom ", at1 + 1,
+                                      " added to the list of atoms"
+                                      " for replacement.")
+                else:
+                    msg_program_warning(
+                        "Atom " + str(i) + " in the input is not carbon!")
+        if args.terminal is not None:
+            if args.verbosity >= 3:
+                print("\nAdding hydrogen atoms from the --terminal key")
+            # Count backwards and add the hydrogen atoms to the list
+            counter = 0
+            for i in range(molecule.num_atoms(), 0, -1):
+                if counter < args.terminal and \
+                        molecule.atm_symbol(i - 1) == "H":
+                    if args.verbosity >= 3:
+                        print("Hydrogen atom ", i,
+                              " added to the list of atoms for replacement.")
+                    list_of_hydrogens.append(i)
+                    counter += 1
+        elif args.replace is None and args.alloncarbon is None:
+            # If no instructions were given at all: default to replacing
+            # the terminal 3 hydrogens
+            if args.verbosity >= 2:
+                print("\nDefaulting to replacement of"
+                      " the last 3 hydrogen atoms")
+            counter = 0
+            for i in range(molecule.num_atoms(), 0, -1):
+                if counter < 3 and molecule.atm_symbol(i - 1) == "H":
+                    if args.verbosity >= 3:
+                        print("Hydrogen atom ", i,
+                              " added to the list of atoms for replacement.")
+                    list_of_hydrogens.append(i)
+                    counter += 1
+
+        # Abort if we somehow managed to end up with an empty list
+        if not list_of_hydrogens:
+            msg_program_error("No atoms selected for replacement")
+
+        # Ensuring our list is unique
+        list_of_hydrogens = set(list_of_hydrogens)
         if args.verbosity >= 2:
-            print("\nDefaulting to replacement of the last 3 hydrogen atoms")
-        counter = 0
-        for i in range(molecule.num_atoms(), 0, -1):
-            if counter < 3 and molecule.atm_symbol(i - 1) == "H":
-                if args.verbosity >= 3:
-                    print("Hydrogen atom ", i,
-                          " added to the list of atoms for replacement.")
-                list_of_hydrogens.append(i)
-                counter += 1
+            print("\nThere are ", len(list_of_hydrogens),
+                  "hydrogen atoms that have been selected for replacement.")
+            if args.verbosity >= 3:
+                print("Hydrogen atoms: ", list_of_hydrogens)
 
-    # Abort if we somehow managed to end up with an empty list
-    if not list_of_hydrogens:
-        msg_program_error("No atoms selected for replacement")
-
-    # Ensuring our list is unique
-    list_of_hydrogens = set(list_of_hydrogens)
-    if args.verbosity >= 2:
-        print("\nThere are ", len(list_of_hydrogens),
-              "hydrogen atoms that have been selected for replacement.")
-        if args.verbosity >= 3:
-            print("Hydrogen atoms: ", list_of_hydrogens)
-
+    # From here on, we loop over our list and actually do replacements
     for j, i in enumerate(list_of_hydrogens):
         filesuffix = str(j + 1).zfill(
             int(math.ceil(math.log(len(list_of_hydrogens), 10))))
@@ -889,6 +918,17 @@ def main():
             if args.verbosity >= 3:
                 print("\nNew Structure:")
                 print(msg)
+    # The "none" option is just an excuse for simply extracting and printing
+    # the structure to a file
+    if args.group == "none":
+        filename, file_extension = os.path.splitext(args.inputfile)
+        msg = molecule.print_mol(output=args.output,
+                                 file=filename + "-micepes",
+                                 comment=str(molecule.qm_energy))
+        if args.verbosity >= 3:
+            print("\nStructure:")
+            print(msg)
+
 
     # Print program footer
     if args.verbosity >= 1:

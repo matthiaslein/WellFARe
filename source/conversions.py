@@ -2,7 +2,7 @@
 # Methods for unit conversions are defined below
 ###############################################################################
 
-from constants import SymbolToNumber
+from constants import symbol_to_number
 
 
 # Conversion of length in Angstroms to
@@ -38,7 +38,7 @@ def is_float(s):
 # Test if the argument is (can be converted to)
 # an atomic symbol
 def is_atom_symbol(s):
-    if s in SymbolToNumber:
+    if s in symbol_to_number:
         return True
     else:
         return False

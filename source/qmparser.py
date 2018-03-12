@@ -191,7 +191,7 @@ def read_turbo_coord(filename, molecule, verbosity=0):
                     if verbosity >= 3:
                         read_buffer = read_buffer.split()
                         print_found_atom(
-                            NumberToSymbol[int(float(read_buffer[4]))],
+                            number_to_symbol[int(float(read_buffer[4]))],
                             bohr_to_ang(float(read_buffer[0])),
                             bohr_to_ang(float(read_buffer[1])),
                             bohr_to_ang(float(read_buffer[2])))
@@ -208,7 +208,7 @@ def read_turbo_coord(filename, molecule, verbosity=0):
                                z=bohr_to_ang(float(read_buffer[2]))))
         if verbosity >= 3:
             print_add_atom(
-                NumberToSymbol[int(float(read_buffer[4]))],
+                number_to_symbol[int(float(read_buffer[4]))],
                 bohr_to_ang(float(read_buffer[0])),
                 bohr_to_ang(float(read_buffer[1])),
                 bohr_to_ang(float(read_buffer[2])))
@@ -269,15 +269,15 @@ def read_gauss_coord(filename, molecule, verbosity=0):
                     if verbosity >= 3:
                         read_buffer = read_buffer.split()
                         print_found_atom(
-                            NumberToSymbol[int(read_buffer[1])],
+                            number_to_symbol[int(read_buffer[1])],
                             float(read_buffer[3]), float(read_buffer[4]),
                             float(read_buffer[5]))
                 else:
                     break
     f.close()
     if len(geom) == 0:
-        # For some reason, we don't have the "input orientation" printed, let's try and read from the
-        # standard orientation instead
+        # For some reason, we don't have the "input orientation" printed,
+        #  let's try and read from the standard orientation instead
         f = open(filename, 'r')
         for line in f:
             if line.find("Standard orientation:") != -1:
@@ -294,7 +294,7 @@ def read_gauss_coord(filename, molecule, verbosity=0):
                         if verbosity >= 3:
                             read_buffer = read_buffer.split()
                             print_found_atom(
-                                NumberToSymbol[int(read_buffer[1])],
+                                number_to_symbol[int(read_buffer[1])],
                                 float(read_buffer[3]), float(read_buffer[4]),
                                 float(read_buffer[5]))
                     else:
@@ -311,13 +311,76 @@ def read_gauss_coord(filename, molecule, verbosity=0):
                  z=float(read_buffer[5])))
         if verbosity >= 3:
             print_add_atom(
-                NumberToSymbol[int(read_buffer[1])], read_buffer[3],
+                number_to_symbol[int(read_buffer[1])], read_buffer[3],
                 read_buffer[4], read_buffer[5])
     return
 
 
+def read_gauss_qm_energy(filename, molecule, verbosity=0):
+    f = open(filename, 'r')
+    qm_energies = []
+    for line in f:
+        if line.find("SCF Done:") != -1:
+            if verbosity >= 3:
+                print("\nEnergy from SCF cycle found")
+                print(str(line))
+            qm_energies.append(line)
+    # Take the last SCF energy from the file and assign that value
+    # as the QM equilibrium energy of the molecule
+    i = qm_energies[len(qm_energies) - 1]
+    read_buffer = i.split()
+    qm_energy_on_file = float(read_buffer[4])
+    molecule.qm_energy = qm_energy_on_file
+    if verbosity >= 2:
+        print("\nReading of QM equilibrium energy complete")
+        if verbosity >= 3:
+            print("Ee_QM = " + str(qm_energy_on_file))
+    f.close()
+
+
+def read_orca_qm_energy(filename, molecule, verbosity=0):
+    f = open(filename, 'r')
+    qm_energies = []
+    for line in f:
+        if line.find("FINAL SINGLE POINT ENERGY") != -1:
+            if verbosity >= 3:
+                print("\nSingle point energy found")
+                print(str(line))
+            qm_energies.append(line)
+    i = qm_energies[len(qm_energies) - 1]
+    read_buffer = i.split()
+    qm_energy_on_file = float(read_buffer[4])
+    molecule.qm_energy(qm_energy_on_file)
+    if verbosity >= 2:
+        print("\nReading of QM equilibrium energy complete")
+        if verbosity >= 3:
+            print("Ee_QM = " + str(qm_energy_on_file))
+    f.close()
+
+
+def read_turbomole_qm_energy(filename, molecule, verbosity=0):
+    f = open(filename, 'r')
+    qm_energies = []
+    for line in f:
+        if line.find("         *    SCF-energy") != -1:
+            if verbosity >= 3:
+                print("\nSCF energy found")
+                print(str(line))
+            qm_energies.append(line)
+    i = qm_energies[len(qm_energies) - 1]
+    read_buffer = i.split()
+    qm_energy_on_file = float(read_buffer[3])
+    molecule.setQMenergy(qm_energy_on_file)
+    if verbosity >= 2:
+        print("\nReading of QM equilibrium energy complete")
+        if verbosity >= 3:
+            print("Ee_QM = " + str(qm_energy_on_file))
+    f.close()
+
+
 def extract_molecular_data(filename, molecule, verbosity=0,
                            read_coordinates=True, read_bond_orders=True,
+                           read_qm_energy=False,
                            build_angles=False, build_dihedrals=False):
     if verbosity >= 1:
         print("\nSetting up WellFARe molecule {} from file {}.".format(
@@ -379,6 +442,18 @@ def extract_molecular_data(filename, molecule, verbosity=0,
             build_bond_orders(molecule, [], verbosity=verbosity)
         else:
             build_bond_orders(molecule, [], verbosity=verbosity)
+
+    # Check if we need to the quantum mechanically calculated enery
+    if read_qm_energy is True:
+        if program == "gauss":
+            read_gauss_qm_energy(filename, molecule, verbosity=verbosity)
+        elif program == "orca":
+            read_orca_qm_energy(filename, molecule, verbosity=verbosity)
+        elif program == "turbomole":
+            read_turbomole_qm_energy(molecule, [], verbosity=verbosity)
+        else:
+            # There's no QM energy in xyz files...
+            pass
 
     # Check if we need to build bond angles
     if build_angles is True:

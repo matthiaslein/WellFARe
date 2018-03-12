@@ -42,23 +42,23 @@ class Atom:
         """
 
         if sym is None and charge is not None:
-            if charge in NumberToSymbol:
+            if charge in number_to_symbol:
                 self.charge = charge
             else:
                 self.charge = 1
         elif sym is not None and charge is None:
-            if sym in SymbolToNumber:
-                self.charge = SymbolToNumber[sym]
+            if sym in symbol_to_number:
+                self.charge = symbol_to_number[sym]
             else:
                 self.charge = 1
         elif sym is None and charge is None:
             self.charge = 1
         else:
             # If both are specified, the symbol takes precedence
-            self.charge = SymbolToNumber[sym]
+            self.charge = symbol_to_number[sym]
 
         if mass is None:
-            self.mass = SymbolToMass[self.symbol()]
+            self.mass = symbol_to_mass[self.symbol()]
         else:
             self.mass = mass
 
@@ -96,7 +96,7 @@ class Atom:
         :return: Returns the atomic symbol of the atom (from constants.py)
         """
 
-        return NumberToSymbol[self.charge]
+        return number_to_symbol[self.charge]
 
     def xpos(self) -> float:
         """
@@ -129,7 +129,7 @@ class Atom:
         :param q: The nuclear charge (i.e. atomic number)
         :return: None
         """
-        if q in NumberToSymbol:
+        if q in number_to_symbol:
             self.charge = q
 
     def set_x(self, x: float) -> None:
@@ -175,7 +175,7 @@ class Atom:
 
 def main():
     # Create all atoms in the periodic table up to ₁₁₈Og.
-    for i in SymbolToNumber:
+    for i in symbol_to_number:
         print(Atom(sym=i))
 
 
