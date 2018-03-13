@@ -5,6 +5,7 @@
 from typing import Optional
 import math
 import numpy as np
+from multiprocessing import Pool, cpu_count
 
 from atom import Atom
 from constants import symbol_to_mass, symbol_to_covalent_radius
@@ -732,8 +733,26 @@ def build_molecular_angles(molecule, verbosity=0):
     return list_of_bond_angles
 
 
+def batch_compare_distances(molecule, list_of_pairs, tolerance, verbosity = 0):
+    results = []
+    for i in list_of_pairs:
+        distance = molecule.atm_atm_dist(i[0], i[1])
+        if distance <= (
+                symbol_to_covalent_radius[molecule.atm_symbol(i[0])] +
+                symbol_to_covalent_radius[
+                    molecule.atm_symbol(i[1])]) * tolerance:
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}) and {:<3} ({:3d})"
+                    " (Distance: {:.3f} Å)".format(
+                        molecule.atm_symbol(i[0]), i[0],
+                        molecule.atm_symbol(i[1]), i[1],
+                        distance))
+            results.append([i[0],i[1]])
+    return results
+
 def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
-                      distfactor=1.3, deletefirst=True):
+                      distfactor=1.3, deletefirst=True, cpu_number=1):
     """
     This method populates the list of bonds of a given molecule.
 
@@ -760,14 +779,16 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
     # Test if we actually have Quantum Mechanical (qm) Bond orders
     if np.count_nonzero(bo) != 0 and molecule.num_atoms() != 1:
         if verbosity >= 2:
-            print("\nLooking for bonds in WellFARe molecule: ", molecule.name)
+            print("\nLooking for bonds in WellFARe molecule: ",
+                  molecule.name)
             print("(using bond orders with a cutoff of {: .2f}):".format(
                 bondcutoff))
         for i in range(0, molecule.num_atoms()):
             for j in range(i + 1, molecule.num_atoms()):
                 if bo[i][j] >= bondcutoff:
                     molecule.add_bond(i, j)
-                    list_of_bond_lengths.append(molecule.atm_atm_dist(i, j))
+                    list_of_bond_lengths.append(
+                        molecule.atm_atm_dist(i, j))
                     if verbosity >= 3:
                         print(
                             " {:<3} ({:4d}) and {:<3} ({:4d})"
@@ -775,28 +796,24 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
                                 molecule.atoms[i].symbol(), i,
                                 molecule.atoms[j].symbol(), j,
                                 float(bo[i][j]), list_of_bond_lengths[-1]))
-    # Else use 130% of the sum of covalent radii as criterion for a bond (user
-    # defined: distfactor)
+    # Only do bonds if there's more than one atom
     elif molecule.num_atoms() != 1:
         if verbosity >= 2:
             print("\nLooking for bonds in WellFARe molecule:", molecule.name)
             print(
                 "(using covalent radii scaled by {: .2f}):".format(distfactor))
+        pairs = []
         for i in range(0, molecule.num_atoms()):
             for j in range(i + 1, molecule.num_atoms()):
-                if molecule.atm_atm_dist(i, j) <= (
-                        symbol_to_covalent_radius[molecule.atoms[i].symbol()] +
-                        symbol_to_covalent_radius[
-                            molecule.atoms[j].symbol()]) * distfactor:
-                    molecule.add_bond(i, j)
-                    list_of_bond_lengths.append(molecule.atm_atm_dist(i, j))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}) and {:<3} ({:3d})"
-                            " (Distance: {:.3f} Å)".format(
-                                molecule.atoms[i].symbol(), i,
-                                molecule.atoms[j].symbol(), j,
-                                list_of_bond_lengths[-1]))
+                pairs.append([i, j])
+        chunks = [pairs[i:i + (len(pairs) // cpu_number)] for i in
+                  range(0, len(pairs), (len(pairs) // cpu_number))]
+        with Pool(processes=cpu_number) as p:
+            res = [p.apply_async(batch_compare_distances, args=(molecule, i, distfactor, verbosity)) for i in chunks]
+            results = [p.get() for p in res]
+        for i in results:
+            for j in i:
+                molecule.add_bond(j[0],j[1])
     else:
         if verbosity >= 2:
             print("\nNot looking for bonds in WellFARe molecule:",

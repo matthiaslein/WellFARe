@@ -381,7 +381,8 @@ def read_turbomole_qm_energy(filename, molecule, verbosity=0):
 def extract_molecular_data(filename, molecule, verbosity=0,
                            read_coordinates=True, read_bond_orders=True,
                            read_qm_energy=False,
-                           build_angles=False, build_dihedrals=False):
+                           build_angles=False, build_dihedrals=False,
+                           cpu_number=1):
     if verbosity >= 1:
         print("\nSetting up WellFARe molecule {} from file {}.".format(
             molecule.name, filename))
@@ -441,7 +442,8 @@ def extract_molecular_data(filename, molecule, verbosity=0,
         elif program == "turbomole":
             build_bond_orders(molecule, [], verbosity=verbosity)
         else:
-            build_bond_orders(molecule, [], verbosity=verbosity)
+            build_bond_orders(molecule, [], verbosity=verbosity,
+                                       cpu_number=cpu_number)
 
     # Check if we need to the quantum mechanically calculated enery
     if read_qm_energy is True:
@@ -468,9 +470,11 @@ def main():
     prg_start_time = time.time()
     # Create an example molecule and add some atoms
     example = Molecule("Example Molecule")
-    extract_molecular_data("../examples/g09-h3b-nh3.log", example, verbosity=3)
-    # extract_molecular_data("../examples/pdb100d.xyz", example, verbosity=3)
-    print(example.print_mol(output="gauss"))
+    # extract_molecular_data("../examples/g09-h3b-nh3.log", example, verbosity=3)
+    extract_molecular_data("../examples/pdb200l.xyz", example, verbosity=3,
+                           read_coordinates=True, read_bond_orders=True,
+                           build_angles=True, build_dihedrals=True, cpu_number=4)
+    # print(example.print_mol(output="gauss"))
     msg_program_footer(prg_start_time)
 
 

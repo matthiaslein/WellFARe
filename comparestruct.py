@@ -229,7 +229,7 @@ def main():
                                 prg_start_time))
     else:
         if args.numproc == 1:
-            if args.verbosity >= 2:
+            if args.verbosity >= 3:
                 print(
                     "\nStarting serial execution on a single processor core.")
             for i in range(0, molecule1.num_atoms()):
@@ -242,7 +242,7 @@ def main():
                             msg_program_footer(prg_start_time)
                         sys.exit(-1)
         else:
-            if args.verbosity >= 2:
+            if args.verbosity >= 3:
                 print(
                     "\nStarting parallel execution on {} processor"
                     " cores.".format(args.numproc))
@@ -250,15 +250,12 @@ def main():
             for i in range(0, molecule1.num_atoms()):
                 for j in range(i + 1, molecule1.num_atoms()):
                     pairs.append([i, j])
-            # [list[i:i + chunksize] for i in range(0, len(list), chunksize)]
-            chunks = [pairs[i:i + (len(pairs) // args.numproc)] for i in
-                      range(0, len(pairs), (len(pairs) // args.numproc))]
+            chunks = [pairs[i:i + (len(pairs) // 100)] for i in
+                      range(0, len(pairs), (len(pairs) // 100))]
             with Pool(processes=args.numproc) as p:
-                results = []
-                for i in chunks:
-                    res = p.apply(check_dist_list, args=(
-                        molecule1, molecule2, i, args.tolerance))
-                    results.append(res)
+                res = [p.apply_async(check_dist_list, args=(
+                     molecule1, molecule2, i, args.tolerance)) for i in chunks]
+                results = [p.get() for p in res]
             if False in results:
                 if args.verbosity >= 2:
                     print("Mismatch in local distance matrix.")

@@ -929,7 +929,6 @@ def main():
             print("\nStructure:")
             print(msg)
 
-
     # Print program footer
     if args.verbosity >= 1:
         msg_program_footer(prg_start_time)
