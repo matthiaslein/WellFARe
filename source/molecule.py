@@ -733,7 +733,7 @@ def build_molecular_angles(molecule, verbosity=0):
     return list_of_bond_angles
 
 
-def batch_compare_distances(molecule, list_of_pairs, tolerance, verbosity = 0):
+def batch_compare_distances(molecule, list_of_pairs, tolerance, verbosity=0):
     results = []
     for i in list_of_pairs:
         distance = molecule.atm_atm_dist(i[0], i[1])
@@ -748,11 +748,13 @@ def batch_compare_distances(molecule, list_of_pairs, tolerance, verbosity = 0):
                         molecule.atm_symbol(i[0]), i[0],
                         molecule.atm_symbol(i[1]), i[1],
                         distance))
-            results.append([i[0],i[1]])
+            results.append([i[0], i[1], distance])
     return results
 
+
 def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
-                      distfactor=1.3, deletefirst=True, cpu_number=1):
+                      distfactor=1.3, deletefirst=True, canonical_order=False,
+                      cpu_number=1):
     """
     This method populates the list of bonds of a given molecule.
 
@@ -766,6 +768,13 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
                        above which no bond will be assigned between two atoms.
     :param deletefirst: Should the list of bonds be deleted, before a new list
                         is built?
+    :param cpu_number: The number of processor cores to be used via the
+                       multiprocessing module.
+    :param canonical_order: Setting this to True will make sure the list of
+                            bonds (and the list of returned bond lengths) are
+                            sorted (the list might be returned in arbitrary
+                            order otherwise because of the asynchronous
+                            parallelisation).
     :return: A list of all bond lengths in Å in the same order as the bonds.
     """
 
@@ -796,6 +805,12 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
                                 molecule.atoms[i].symbol(), i,
                                 molecule.atoms[j].symbol(), j,
                                 float(bo[i][j]), list_of_bond_lengths[-1]))
+        if canonical_order is True and len(list_of_bond_lengths) > 0:
+            # If called for, we sort the list of bonds (see "elif" below)
+            # Unlikely to be necessary in the case of qm bond-orders...
+            zipped_list = sorted(
+                list(zip(molecule.bonds, list_of_bond_lengths)))
+            molecule.bonds, list_of_bond_lengths = list(zip(*zipped_list))
     # Only do bonds if there's more than one atom
     elif molecule.num_atoms() != 1:
         if verbosity >= 2:
@@ -809,11 +824,20 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
         chunks = [pairs[i:i + (len(pairs) // cpu_number)] for i in
                   range(0, len(pairs), (len(pairs) // cpu_number))]
         with Pool(processes=cpu_number) as p:
-            res = [p.apply_async(batch_compare_distances, args=(molecule, i, distfactor, verbosity)) for i in chunks]
+            res = [p.apply_async(batch_compare_distances,
+                                 args=(molecule, i, distfactor, verbosity)) for
+                   i in chunks]
             results = [p.get() for p in res]
         for i in results:
             for j in i:
-                molecule.add_bond(j[0],j[1])
+                molecule.add_bond(j[0], j[1])
+                list_of_bond_lengths.append(j[2])
+        if canonical_order is True and len(list_of_bond_lengths) > 0:
+            # If called for, we sort the list of bonds (might be in arbitrary
+            # order because of asynchronous parallelism)
+            zipped_list = sorted(
+                list(zip(molecule.bonds, list_of_bond_lengths)))
+            molecule.bonds, list_of_bond_lengths = list(zip(*zipped_list))
     else:
         if verbosity >= 2:
             print("\nNot looking for bonds in WellFARe molecule:",

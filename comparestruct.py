@@ -8,6 +8,7 @@ import argparse
 import math
 from multiprocessing import Pool, cpu_count
 
+
 from messages import *
 from molecule import Molecule, build_molecular_dihedrals, \
     build_molecular_angles, build_bond_orders
@@ -130,8 +131,26 @@ def main():
     # matrix (below).
     if args.method == "internal":
         # Determine bond distances and check if they're identical
-        bonds_mol1 = build_bond_orders(molecule1, verbosity=args.verbosity - 1)
-        bonds_mol2 = build_bond_orders(molecule2, verbosity=args.verbosity - 1)
+        bonds_mol1 = build_bond_orders(molecule1, verbosity=args.verbosity - 1,
+                                       canonical_order=True,
+                                       cpu_number=args.numproc)
+        if args.verbosity >= 3:
+            print(
+                msg_timestamp("\n{} bonds identified for molecule 1 ".format(
+                    len(molecule1.bonds)), prg_start_time))
+        bonds_mol2 = build_bond_orders(molecule2, verbosity=args.verbosity - 1,
+                                       canonical_order=False,
+                                       cpu_number=args.numproc)
+        if args.verbosity >= 3:
+            print(
+                msg_timestamp("\n{} bonds identified for molecule 2 ".format(
+                    len(molecule2.bonds)), prg_start_time))
+        if len(bonds_mol1) != len(bonds_mol2):
+            if args.verbosity >= 2:
+                print("Mismatching number of bonds")
+            if args.verbosity >= 1:
+                msg_program_footer(prg_start_time)
+            sys.exit(-1)
         # Tolerance will be ±0.1 Å, ±0.01 Å or ±0.001 Å
         tol = (10 ** (-1.0 * args.tolerance))
         if args.verbosity >= 3:
@@ -168,7 +187,7 @@ def main():
         # Tolerance will be ±5°, ±0.5° or ±0.05°
         tol = (10 ** (-1.0 * args.tolerance)) * 50.0
         if args.verbosity >= 3:
-            print("Tolerance for bond angle comparison is ±{}°".format(tol))
+            print("\nTolerance for bond angle comparison is ±{}°".format(tol))
         for idx, bond in enumerate(molecule1.angles):
             if bond == molecule2.angles[idx]:
                 dist_diff = math.fabs(angles_mol1[idx] - angles_mol2[idx])
@@ -199,8 +218,8 @@ def main():
         # Tolerance will be ±15°, ±1.5° or ±0.15°
         tol = (10 ** (-1.0 * args.tolerance)) * 150.0
         if args.verbosity >= 3:
-            print(
-                "Tolerance for dihedral angle comparison is ±{}°".format(tol))
+            print("\nTolerance for dihedral angle comparison is ±{}°".format(
+                tol))
         for idx, bond in enumerate(molecule1.dihedrals):
             if bond == molecule2.dihedrals[idx]:
                 # The difference calculation for dihedrals is a bit more
@@ -250,8 +269,8 @@ def main():
             for i in range(0, molecule1.num_atoms()):
                 for j in range(i + 1, molecule1.num_atoms()):
                     pairs.append([i, j])
-            chunks = [pairs[i:i + (len(pairs) // 100)] for i in
-                      range(0, len(pairs), (len(pairs) // 100))]
+            chunks = [pairs[i:i + (len(pairs) // args.numproc)] for i in
+                      range(0, len(pairs), (len(pairs) // args.numproc))]
             with Pool(processes=args.numproc) as p:
                 res = [p.apply_async(check_dist_list, args=(
                      molecule1, molecule2, i, args.tolerance)) for i in chunks]
