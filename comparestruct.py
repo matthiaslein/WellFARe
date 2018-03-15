@@ -6,7 +6,9 @@
 
 import argparse
 import math
+import itertools
 from multiprocessing import Pool, cpu_count
+from scipy import misc
 
 from messages import *
 from molecule import Molecule, build_molecular_dihedrals, \
@@ -86,11 +88,11 @@ def main():
     if args.verbosity >= 1:
         msg_program_header("CompareStruct", 1.0)
 
-    molecule1 = Molecule("First input Structure", 0)
+    molecule1 = Molecule("Molecule 1", 0)
     extract_molecular_data(args.file1, molecule1, read_bond_orders=False,
                            verbosity=0)
 
-    molecule2 = Molecule("Second input Structure", 0)
+    molecule2 = Molecule("Molecule 2", 0)
     extract_molecular_data(args.file2, molecule2, read_bond_orders=False,
                            verbosity=0)
 
@@ -136,14 +138,14 @@ def main():
                                        cpu_number=args.numproc)
         if args.verbosity >= 3:
             print(
-                msg_timestamp("\n{} bonds identified for molecule 1 ".format(
+                msg_timestamp("\n{} bonds identified for Molecule 1 ".format(
                     len(molecule1.bonds)), prg_start_time))
         bonds_mol2 = build_bond_orders(molecule2, verbosity=args.verbosity - 1,
                                        canonical_order=True,
                                        cpu_number=args.numproc)
         if args.verbosity >= 3:
             print(
-                msg_timestamp("\n{} bonds identified for molecule 2 ".format(
+                msg_timestamp("\n{} bonds identified for Molecule 2 ".format(
                     len(molecule2.bonds)), prg_start_time))
         if len(bonds_mol1) != len(bonds_mol2):
             if args.verbosity >= 2:
@@ -186,7 +188,7 @@ def main():
                                              cpu_number=args.numproc)
         if args.verbosity >= 3:
             print(
-                msg_timestamp("\n{} angles identified for molecule 1 ".format(
+                msg_timestamp("\n{} angles identified for Molecule 1 ".format(
                     len(molecule1.angles)), prg_start_time))
         angles_mol2 = build_molecular_angles(molecule2,
                                              verbosity=args.verbosity - 1,
@@ -194,7 +196,7 @@ def main():
                                              cpu_number=args.numproc)
         if args.verbosity >= 3:
             print(
-                msg_timestamp("\n{} angles identified for molecule 2 ".format(
+                msg_timestamp("\n{} angles identified for Molecule 2 ".format(
                     len(molecule2.angles)), prg_start_time))
         if len(angles_mol1) != len(angles_mol2):
             if args.verbosity >= 2:
@@ -236,7 +238,7 @@ def main():
         if args.verbosity >= 3:
             print(
                 msg_timestamp(
-                    "\n{} dihedrals identified for molecule 1 ".format(
+                    "\n{} dihedrals identified for Molecule 1 ".format(
                         len(molecule1.dihedrals)), prg_start_time))
         dihedrals_m2 = build_molecular_dihedrals(molecule2,
                                                  verbosity=args.verbosity - 1,
@@ -245,7 +247,7 @@ def main():
         if args.verbosity >= 3:
             print(
                 msg_timestamp(
-                    "\n{} dihedrals identified for molecule 2 ".format(
+                    "\n{} dihedrals identified for Molecule 2 ".format(
                         len(molecule2.dihedrals)), prg_start_time))
         if len(dihedrals_m1) != len(dihedrals_m2):
             if args.verbosity >= 2:
@@ -303,15 +305,21 @@ def main():
                 print(
                     "\nStarting parallel execution on {} processor"
                     " cores.".format(args.numproc))
-            pairs = []
-            for i in range(0, molecule1.num_atoms()):
-                for j in range(i + 1, molecule1.num_atoms()):
-                    pairs.append([i, j])
-            chunks = [pairs[i:i + (len(pairs) // args.numproc)] for i in
-                      range(0, len(pairs), (len(pairs) // args.numproc))]
             with Pool(processes=args.numproc) as p:
-                res = [p.apply_async(check_dist_list, args=(
-                    molecule1, molecule2, i, args.tolerance)) for i in chunks]
+                res = []
+                chunk = []
+                chop = args.numproc * 2  # Each cpu goes through 2 chunks
+                chunk_s = int(misc.comb(N=molecule1.num_atoms(), k=2) / chop)
+                # This itertools.combination expression creates all
+                # pairs of atoms
+                for i in itertools.combinations(
+                        range(0, molecule1.num_atoms()), 2):
+                    chunk.append(list(i))
+                    if len(chunk) >= chunk_s:  # Calculated as nCr above
+                        res.append(p.apply_async(check_dist_list,
+                                                 args=(molecule1, molecule2,
+                                                       chunk, args.tolerance)))
+                        chunk = []
                 results = [p.get() for p in res]
             if False in results:
                 if args.verbosity >= 2:

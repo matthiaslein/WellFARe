@@ -7,6 +7,7 @@ import itertools
 import numpy as np
 from typing import Optional
 from multiprocessing import Pool
+from scipy import misc
 
 from atom import Atom
 from constants import symbol_to_mass, symbol_to_covalent_radius
@@ -616,10 +617,12 @@ def build_molecular_dihedrals(molecule, verbosity=0, deletefirst=True,
         with Pool(processes=cpu_number) as p:
             res = []
             chunk = []
+            chop = cpu_number * 5     # Every cpu has to go through 5 chunks
+            chunk_s = int(misc.comb(N=len(molecule.angles), k=2) / chop)
             # This itertools.combination expression creates all pairs of bonds
             for i in itertools.combinations(molecule.angles, 2):
                 chunk.append(list(i))
-                if len(chunk) > 500000:  # Is 500,000 a good size?
+                if len(chunk) >= chunk_s:  # Calculated from nCr above.
                     res.append(p.apply_async(batch_identify_dihedrals,
                                              args=(molecule,
                                                    chunk, verbosity)))
@@ -733,10 +736,12 @@ def build_molecular_angles(molecule, verbosity=0, deletefirst=True,
         with Pool(processes=cpu_number) as p:
             res = []
             chunk = []
+            chop = cpu_number * 5  # Every cpu has to go through 5 chunks
+            chunk_s = int(misc.comb(N=len(molecule.bonds), k=2) / chop)
             # This itertools.combination expression creates all pairs of bonds
             for i in itertools.combinations(molecule.bonds, 2):
                 chunk.append(list(i))
-                if len(chunk) > 500000:  # Is 500,000 a good size?
+                if len(chunk) >= chunk_s:  # Calculated from nCr above
                     res.append(p.apply_async(batch_identify_angles,
                                              args=(molecule,
                                                    chunk, verbosity)))
@@ -854,10 +859,12 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
         with Pool(processes=cpu_number) as p:
             res = []
             chunk = []
+            chop = cpu_number * 2  # Every cpu has to go through 2 chunks
+            chunk_s = int(misc.comb(N=molecule.num_atoms(), k=2) / chop)
             # This itertools.combination expression creates all pairs of atoms
             for i in itertools.combinations(range(0, molecule.num_atoms()), 2):
                 chunk.append(list(i))
-                if len(chunk) > 500000:  # Is 500,000 a good size?
+                if len(chunk) >= chunk_s:  # Calculated as nCr above
                     res.append(p.apply_async(batch_compare_distances,
                                              args=(molecule, chunk,
                                                    distfactor, verbosity)))
