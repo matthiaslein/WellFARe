@@ -2,10 +2,11 @@
 # Molecule class and class methods to be defined below #
 ########################################################
 
-from typing import Optional
 import math
+import itertools
 import numpy as np
-from multiprocessing import Pool, cpu_count
+from typing import Optional
+from multiprocessing import Pool
 
 from atom import Atom
 from constants import symbol_to_mass, symbol_to_covalent_radius
@@ -519,111 +520,124 @@ class Molecule:
         return s
 
 
-def build_molecular_dihedrals(molecule, verbosity=0):
+def batch_identify_dihedrals(molecule, list_of_pairs, verbosity=0):
+    results = []
+    for i in list_of_pairs:
+        if i[0][1] == i[1][0] and i[0][2] == i[1][1]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_atm_dihedral(i[0][0], i[0][1], i[1][1],
+                                                  i[1][2]))
+            results.append([i[0][0], i[0][1], i[1][1], i[1][2], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                        molecule.atm_symbol(i[0][0]), i[0][0],
+                        molecule.atm_symbol(i[0][1]), i[0][1],
+                        molecule.atm_symbol(i[1][1]), i[1][1],
+                        molecule.atm_symbol(i[1][2]), i[1][2], angle))
+        if i[0][1] == i[1][2] and i[0][2] == i[1][1]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_atm_dihedral(i[0][0], i[0][1],
+                                                  i[1][1],
+                                                  i[1][0]))
+            results.append([i[0][0], i[0][1], i[1][1], i[1][0], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                        molecule.atm_symbol(i[0][0]), i[0][0],
+                        molecule.atm_symbol(i[0][1]), i[0][1],
+                        molecule.atm_symbol(i[1][1]), i[1][1],
+                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
+        if i[0][1] == i[1][0] and i[0][0] == i[1][1]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_atm_dihedral(i[0][2], i[0][1],
+                                                  i[1][1],
+                                                  i[1][2]))
+            results.append([i[0][2], i[0][1], i[1][1], i[1][1], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                        molecule.atm_symbol(i[0][2]), i[0][2],
+                        molecule.atm_symbol(i[0][1]), i[0][1],
+                        molecule.atm_symbol(i[1][1]), i[1][1],
+                        molecule.atm_symbol(i[1][2]), i[1][2], angle))
+        if i[0][1] == i[1][2] and i[0][0] == i[1][1]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_atm_dihedral(i[0][2], i[0][1],
+                                                  i[1][1],
+                                                  i[1][0]))
+            results.append([i[0][2], i[0][1], i[1][1], i[1][0], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                        molecule.atm_symbol(i[0][2]), i[0][2],
+                        molecule.atm_symbol(i[0][1]), i[0][1],
+                        molecule.atm_symbol(i[1][1]), i[1][1],
+                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
+    return results
+
+
+def build_molecular_dihedrals(molecule, verbosity=0, deletefirst=True,
+                              canonical_order=False, cpu_number=1):
     """
 
     :param molecule: The molecule to be operated on
     :param verbosity: How chatty this method is
+    :param deletefirst: Should the list of dihedrals be deleted, before a
+                        new list is built?
+    :param cpu_number: The number of processor cores to be used via the
+                       multiprocessing module.
+    :param canonical_order: Setting this to True will make sure the list of
+                            dihedrals (and the list of returned values) are
+                            sorted (the list might be returned in arbitrary
+                            order otherwise because of the asynchronous
+                            parallelisation).
     :return: A list of the values of the dihedral angles in the same order as
              the dihedrals that have been identified
     """
 
     list_of_dihedrals = []
 
+    if deletefirst is True:
+        molecule.dihedrals = []
+
     if len(molecule.angles) > 1:
         if verbosity >= 2:
             print("\nLooking for dihedrals in WellFARe molecule: ",
                   molecule.name)
-        for i in range(0, len(molecule.angles)):
-            for j in range(i + 1, len(molecule.angles)):
-                if molecule.angles[i][1] == molecule.angles[j][0] and \
-                        molecule.angles[i][2] == molecule.angles[j][1]:
-                    molecule.add_dihedral(molecule.angles[i][0],
-                                          molecule.angles[i][1],
-                                          molecule.angles[i][2],
-                                          molecule.angles[j][2])
-                    list_of_dihedrals.append(
-                        math.degrees(molecule.dihedral_angle(
-                            len(molecule.dihedrals) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                                molecule.atoms[molecule.angles[i][0]].symbol(),
-                                molecule.angles[i][0],
-                                molecule.atoms[molecule.angles[i][1]].symbol(),
-                                molecule.angles[i][1],
-                                molecule.atoms[molecule.angles[i][2]].symbol(),
-                                molecule.angles[i][2],
-                                molecule.atoms[molecule.angles[j][2]].symbol(),
-                                molecule.angles[j][2],
-                                list_of_dihedrals[-1]))
-                if molecule.angles[i][1] == molecule.angles[j][2] and \
-                        molecule.angles[i][2] == molecule.angles[j][1]:
-                    molecule.add_dihedral(molecule.angles[i][0],
-                                          molecule.angles[i][1],
-                                          molecule.angles[i][2],
-                                          molecule.angles[j][0])
-                    list_of_dihedrals.append(
-                        math.degrees(molecule.dihedral_angle(
-                            len(molecule.dihedrals) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                                molecule.atoms[molecule.angles[i][0]].symbol(),
-                                molecule.angles[i][0],
-                                molecule.atoms[molecule.angles[i][1]].symbol(),
-                                molecule.angles[i][1],
-                                molecule.atoms[molecule.angles[i][2]].symbol(),
-                                molecule.angles[i][2],
-                                molecule.atoms[molecule.angles[j][0]].symbol(),
-                                molecule.angles[j][0],
-                                list_of_dihedrals[-1]))
-                if molecule.angles[i][1] == molecule.angles[j][0] and \
-                        molecule.angles[i][0] == molecule.angles[j][1]:
-                    molecule.add_dihedral(molecule.angles[i][2],
-                                          molecule.angles[j][0],
-                                          molecule.angles[j][1],
-                                          molecule.angles[j][2])
-                    list_of_dihedrals.append(
-                        math.degrees(molecule.dihedral_angle(
-                            len(molecule.dihedrals) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                                molecule.atoms[molecule.angles[i][2]].symbol(),
-                                molecule.angles[i][2],
-                                molecule.atoms[molecule.angles[j][0]].symbol(),
-                                molecule.angles[j][0],
-                                molecule.atoms[molecule.angles[j][1]].symbol(),
-                                molecule.angles[j][1],
-                                molecule.atoms[molecule.angles[j][2]].symbol(),
-                                molecule.angles[j][2],
-                                list_of_dihedrals[-1]))
-                if molecule.angles[i][1] == molecule.angles[j][2] and \
-                        molecule.angles[i][0] == molecule.angles[j][1]:
-                    molecule.add_dihedral(molecule.angles[i][2],
-                                          molecule.angles[j][2],
-                                          molecule.angles[j][1],
-                                          molecule.angles[j][0])
-                    list_of_dihedrals.append(
-                        math.degrees(molecule.dihedral_angle(
-                            len(molecule.dihedrals) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                                molecule.atoms[molecule.angles[i][2]].symbol(),
-                                molecule.angles[i][2],
-                                molecule.atoms[molecule.angles[j][2]].symbol(),
-                                molecule.angles[j][2],
-                                molecule.atoms[molecule.angles[j][1]].symbol(),
-                                molecule.angles[j][1],
-                                molecule.atoms[molecule.angles[j][0]].symbol(),
-                                molecule.angles[j][0],
-                                list_of_dihedrals[-1]))
+        if verbosity >= 2 and cpu_number > 1:
+            print(
+                "\nStarting parallel execution on {} processor"
+                " cores.".format(cpu_number))
+        with Pool(processes=cpu_number) as p:
+            res = []
+            chunk = []
+            # This itertools.combination expression creates all pairs of bonds
+            for i in itertools.combinations(molecule.angles, 2):
+                chunk.append(list(i))
+                if len(chunk) > 500000:  # Is 500,000 a good size?
+                    res.append(p.apply_async(batch_identify_dihedrals,
+                                             args=(molecule,
+                                                   chunk, verbosity)))
+                    chunk = []
+            res.append(p.apply_async(batch_identify_dihedrals,
+                                     args=(molecule, chunk, verbosity)))
+            results = [p.get() for p in res]
+        for i in results:
+            for j in i:
+                molecule.add_dihedral(j[0], j[1], j[2], j[3])
+                list_of_dihedrals.append(j[4])
+        if canonical_order is True and len(list_of_dihedrals) > 0:
+            # If called for, we sort the list of angles (might be in arbitrary
+            # order because of asynchronous parallelism "apply_async" above).
+            zipped_list = sorted(
+                list(zip(molecule.angles, list_of_dihedrals)))
+            molecule.angles, list_of_dihedrals = list(zip(*zipped_list))
+
     else:
         if verbosity >= 2:
             print("\nNot looking for dihedrals in WellFARe molecule: ",
@@ -634,14 +648,77 @@ def build_molecular_dihedrals(molecule, verbosity=0):
     return list_of_dihedrals
 
 
-def build_molecular_angles(molecule, verbosity=0):
+def batch_identify_angles(molecule, list_of_pairs, verbosity=0):
+    results = []
+    for i in list_of_pairs:
+        if i[0][0] == i[1][0]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_angle(i[0][1], i[0][0], i[1][1]))
+            results.append([i[0][1], i[0][0], i[1][1], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                        molecule.atm_symbol(i[0][1]), i[0][1],
+                        molecule.atm_symbol(i[0][0]), i[0][0],
+                        molecule.atm_symbol(i[1][1]), i[1][1], angle))
+        if i[0][0] == i[1][1]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_angle(i[0][1], i[0][0], i[1][0]))
+            results.append([i[0][1], i[0][0], i[1][0], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                        molecule.atm_symbol(i[0][1]), i[0][1],
+                        molecule.atm_symbol(i[0][0]), i[0][0],
+                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
+        if i[0][1] == i[1][0]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_angle(i[0][0], i[1][0], i[1][1]))
+            results.append([i[0][0], i[1][0], i[1][1], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                        molecule.atm_symbol(i[0][0]), i[0][0],
+                        molecule.atm_symbol(i[1][0]), i[1][0],
+                        molecule.atm_symbol(i[1][1]), i[1][1], angle))
+        if i[0][1] == i[1][1]:
+            angle = math.degrees(
+                molecule.atm_atm_atm_angle(i[0][0], i[1][1], i[1][0]))
+            results.append([i[0][0], i[1][1], i[1][0], angle])
+            if verbosity >= 3:
+                print(
+                    " {:<3} ({:3d}), {:<3} ({:3d})"
+                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                        molecule.atm_symbol(i[0][0]), i[0][0],
+                        molecule.atm_symbol(i[1][1]), i[1][1],
+                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
+    return results
+
+
+def build_molecular_angles(molecule, verbosity=0, deletefirst=True,
+                           canonical_order=False, cpu_number=1):
     """
 
     :param molecule: The molecule to be operated on
     :param verbosity: How chatty this method is.
+    :param deletefirst: Should the list of angles be deleted, before a new list
+                        is built?
+    :param cpu_number: The number of processor cores to be used via the
+                       multiprocessing module.
+    :param canonical_order: Setting this to True will make sure the list of
+                            angles (and the list of returned degree values) are
+                            sorted (the list might be returned in arbitrary
+                            order otherwise because of the asynchronous
+                            parallelisation).
     :return: A list with the values of all bond angles in degrees in the same
              order as the bond angles.
     """
+
+    if deletefirst is True:
+        molecule.angles = []
 
     list_of_bond_angles = []
 
@@ -649,87 +726,40 @@ def build_molecular_angles(molecule, verbosity=0):
     if len(molecule.bonds) > 1:
         if verbosity >= 2:
             print("\nLooking for angles in WellFARe molecule: ", molecule.name)
-        for i in range(0, len(molecule.bonds)):
-            for j in range(i + 1, len(molecule.bonds)):
-                if molecule.bonds[i][0] == molecule.bonds[j][0]:
-                    molecule.add_angle(molecule.bonds[i][1],
-                                       molecule.bonds[i][0],
-                                       molecule.bonds[j][1])
-                    list_of_bond_angles.append(
-                        math.degrees(molecule.bond_angle(
-                            len(molecule.angles) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                                molecule.atoms[molecule.bonds[i][1]].symbol(),
-                                molecule.bonds[i][1],
-                                molecule.atoms[molecule.bonds[i][0]].symbol(),
-                                molecule.bonds[i][0],
-                                molecule.atoms[molecule.bonds[j][1]].symbol(),
-                                molecule.bonds[j][1],
-                                list_of_bond_angles[-1]))
-                if molecule.bonds[i][0] == molecule.bonds[j][1]:
-                    molecule.add_angle(molecule.bonds[i][1],
-                                       molecule.bonds[i][0],
-                                       molecule.bonds[j][0])
-                    list_of_bond_angles.append(
-                        math.degrees(molecule.bond_angle(
-                            len(molecule.angles) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                                molecule.atoms[molecule.bonds[i][1]].symbol(),
-                                molecule.bonds[i][1],
-                                molecule.atoms[molecule.bonds[i][0]].symbol(),
-                                molecule.bonds[i][0],
-                                molecule.atoms[molecule.bonds[j][0]].symbol(),
-                                molecule.bonds[j][0],
-                                list_of_bond_angles[-1]))
-                if molecule.bonds[i][1] == molecule.bonds[j][0]:
-                    molecule.add_angle(molecule.bonds[i][0],
-                                       molecule.bonds[i][1],
-                                       molecule.bonds[j][1])
-                    list_of_bond_angles.append(
-                        math.degrees(molecule.bond_angle(
-                            len(molecule.angles) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                                molecule.atoms[molecule.bonds[i][0]].symbol(),
-                                molecule.bonds[i][0],
-                                molecule.atoms[molecule.bonds[i][1]].symbol(),
-                                molecule.bonds[i][1],
-                                molecule.atoms[molecule.bonds[j][1]].symbol(),
-                                molecule.bonds[j][1],
-                                list_of_bond_angles[-1]))
-                if molecule.bonds[i][1] == molecule.bonds[j][1]:
-                    molecule.add_angle(molecule.bonds[i][0],
-                                       molecule.bonds[i][1],
-                                       molecule.bonds[j][0])
-                    list_of_bond_angles.append(
-                        math.degrees(molecule.bond_angle(
-                            len(molecule.angles) - 1)))
-                    if verbosity >= 3:
-                        print(
-                            " {:<3} ({:3d}), {:<3} ({:3d})"
-                            " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                                molecule.atoms[molecule.bonds[i][0]].symbol(),
-                                molecule.bonds[i][0],
-                                molecule.atoms[molecule.bonds[i][1]].symbol(),
-                                molecule.bonds[i][1],
-                                molecule.atoms[molecule.bonds[j][0]].symbol(),
-                                molecule.bonds[j][0],
-                                list_of_bond_angles[-1]))
+        if verbosity >= 2 and cpu_number > 1:
+            print(
+                "\nStarting parallel execution on {} processor"
+                " cores.".format(cpu_number))
+        with Pool(processes=cpu_number) as p:
+            res = []
+            chunk = []
+            # This itertools.combination expression creates all pairs of bonds
+            for i in itertools.combinations(molecule.bonds, 2):
+                chunk.append(list(i))
+                if len(chunk) > 500000:  # Is 500,000 a good size?
+                    res.append(p.apply_async(batch_identify_angles,
+                                             args=(molecule,
+                                                   chunk, verbosity)))
+                    chunk = []
+            res.append(p.apply_async(batch_identify_angles,
+                                     args=(molecule, chunk, verbosity)))
+            results = [p.get() for p in res]
+        for i in results:
+            for j in i:
+                molecule.add_angle(j[0], j[1], j[2])
+                list_of_bond_angles.append(j[3])
+        if canonical_order is True and len(list_of_bond_angles) > 0:
+            # If called for, we sort the list of angles (might be in arbitrary
+            # order because of asynchronous parallelism "apply_async" above).
+            zipped_list = sorted(
+                list(zip(molecule.angles, list_of_bond_angles)))
+            molecule.angles, list_of_bond_angles = list(zip(*zipped_list))
     else:
         if verbosity >= 2:
-            print("\nNot looking for angles in WellFARe molecule: ",
-                  molecule.name)
-            print(
-                "(because there are fewer than 2 bonds"
-                " identified in the molecule)")
+            print("\nNot looking for angles in WellFARe"
+                  " molecule: {}".format(molecule.name))
+            print("(because there are fewer than 2 bonds"
+                  " identified in the molecule)")
     return list_of_bond_angles
 
 
@@ -817,16 +847,24 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
             print("\nLooking for bonds in WellFARe molecule:", molecule.name)
             print(
                 "(using covalent radii scaled by {: .2f}):".format(distfactor))
-        pairs = []
-        for i in range(0, molecule.num_atoms()):
-            for j in range(i + 1, molecule.num_atoms()):
-                pairs.append([i, j])
-        chunks = [pairs[i:i + (len(pairs) // cpu_number)] for i in
-                  range(0, len(pairs), (len(pairs) // cpu_number))]
+        if verbosity >= 2 and cpu_number > 1:
+            print(
+                "\nStarting parallel execution on {} processor"
+                " cores.".format(cpu_number))
         with Pool(processes=cpu_number) as p:
-            res = [p.apply_async(batch_compare_distances,
-                                 args=(molecule, i, distfactor, verbosity)) for
-                   i in chunks]
+            res = []
+            chunk = []
+            # This itertools.combination expression creates all pairs of atoms
+            for i in itertools.combinations(range(0, molecule.num_atoms()), 2):
+                chunk.append(list(i))
+                if len(chunk) > 500000:  # Is 500,000 a good size?
+                    res.append(p.apply_async(batch_compare_distances,
+                                             args=(molecule, chunk,
+                                                   distfactor, verbosity)))
+                    chunk = []
+            res.append(p.apply_async(batch_compare_distances,
+                                     args=(molecule, chunk,
+                                           distfactor, verbosity)))
             results = [p.get() for p in res]
         for i in results:
             for j in i:
@@ -834,7 +872,7 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
                 list_of_bond_lengths.append(j[2])
         if canonical_order is True and len(list_of_bond_lengths) > 0:
             # If called for, we sort the list of bonds (might be in arbitrary
-            # order because of asynchronous parallelism)
+            # order because of asynchronous parallelism "apply_async" above).
             zipped_list = sorted(
                 list(zip(molecule.bonds, list_of_bond_lengths)))
             molecule.bonds, list_of_bond_lengths = list(zip(*zipped_list))

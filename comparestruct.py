@@ -8,7 +8,6 @@ import argparse
 import math
 from multiprocessing import Pool, cpu_count
 
-
 from messages import *
 from molecule import Molecule, build_molecular_dihedrals, \
     build_molecular_angles, build_bond_orders
@@ -110,7 +109,8 @@ def main():
     else:
         if args.verbosity >= 3:
             print(
-                msg_timestamp("\nIdentical number of atoms. ", prg_start_time))
+                msg_timestamp("\n{} atoms found in both molecules. ".format(
+                    molecule1.num_atoms()), prg_start_time))
 
     # Next, check if each individual atom in the list is of the same type
     for i in range(0, molecule1.num_atoms()):
@@ -139,7 +139,7 @@ def main():
                 msg_timestamp("\n{} bonds identified for molecule 1 ".format(
                     len(molecule1.bonds)), prg_start_time))
         bonds_mol2 = build_bond_orders(molecule2, verbosity=args.verbosity - 1,
-                                       canonical_order=False,
+                                       canonical_order=True,
                                        cpu_number=args.numproc)
         if args.verbosity >= 3:
             print(
@@ -181,9 +181,27 @@ def main():
 
         # Determine bond angles and check if they're identical
         angles_mol1 = build_molecular_angles(molecule1,
-                                             verbosity=args.verbosity - 1)
+                                             verbosity=args.verbosity - 1,
+                                             canonical_order=True,
+                                             cpu_number=args.numproc)
+        if args.verbosity >= 3:
+            print(
+                msg_timestamp("\n{} angles identified for molecule 1 ".format(
+                    len(molecule1.angles)), prg_start_time))
         angles_mol2 = build_molecular_angles(molecule2,
-                                             verbosity=args.verbosity - 1)
+                                             verbosity=args.verbosity - 1,
+                                             canonical_order=True,
+                                             cpu_number=args.numproc)
+        if args.verbosity >= 3:
+            print(
+                msg_timestamp("\n{} angles identified for molecule 2 ".format(
+                    len(molecule2.angles)), prg_start_time))
+        if len(angles_mol1) != len(angles_mol2):
+            if args.verbosity >= 2:
+                print("Mismatching number of angles")
+            if args.verbosity >= 1:
+                msg_program_footer(prg_start_time)
+            sys.exit(-1)
         # Tolerance will be ±5°, ±0.5° or ±0.05°
         tol = (10 ** (-1.0 * args.tolerance)) * 50.0
         if args.verbosity >= 3:
@@ -212,9 +230,29 @@ def main():
 
         # Determine dihedral angles and check if they're identical
         dihedrals_m1 = build_molecular_dihedrals(molecule1,
-                                                 verbosity=args.verbosity - 1)
+                                                 verbosity=args.verbosity - 1,
+                                                 canonical_order=True,
+                                                 cpu_number=args.numproc)
+        if args.verbosity >= 3:
+            print(
+                msg_timestamp(
+                    "\n{} dihedrals identified for molecule 1 ".format(
+                        len(molecule1.dihedrals)), prg_start_time))
         dihedrals_m2 = build_molecular_dihedrals(molecule2,
-                                                 verbosity=args.verbosity - 1)
+                                                 verbosity=args.verbosity - 1,
+                                                 canonical_order=True,
+                                                 cpu_number=args.numproc)
+        if args.verbosity >= 3:
+            print(
+                msg_timestamp(
+                    "\n{} dihedrals identified for molecule 2 ".format(
+                        len(molecule2.dihedrals)), prg_start_time))
+        if len(dihedrals_m1) != len(dihedrals_m2):
+            if args.verbosity >= 2:
+                print("Mismatching number of dihedrals")
+            if args.verbosity >= 1:
+                msg_program_footer(prg_start_time)
+            sys.exit(-1)
         # Tolerance will be ±15°, ±1.5° or ±0.15°
         tol = (10 ** (-1.0 * args.tolerance)) * 150.0
         if args.verbosity >= 3:
@@ -273,7 +311,7 @@ def main():
                       range(0, len(pairs), (len(pairs) // args.numproc))]
             with Pool(processes=args.numproc) as p:
                 res = [p.apply_async(check_dist_list, args=(
-                     molecule1, molecule2, i, args.tolerance)) for i in chunks]
+                    molecule1, molecule2, i, args.tolerance)) for i in chunks]
                 results = [p.get() for p in res]
             if False in results:
                 if args.verbosity >= 2:
