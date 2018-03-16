@@ -8,7 +8,6 @@ import argparse
 import math
 import itertools
 from multiprocessing import Pool, cpu_count
-from scipy import misc
 
 from messages import *
 from molecule import Molecule, build_molecular_dihedrals, \
@@ -308,14 +307,13 @@ def main():
             with Pool(processes=args.numproc) as p:
                 res = []
                 chunk = []
-                chop = args.numproc * 2  # Each cpu goes through 2 chunks
-                chunk_s = int(misc.comb(N=molecule1.num_atoms(), k=2) / chop)
+                # number_of_ops = misc.comb(N=molecule1.num_atoms(), k=2)
                 # This itertools.combination expression creates all
                 # pairs of atoms
                 for i in itertools.combinations(
                         range(0, molecule1.num_atoms()), 2):
                     chunk.append(list(i))
-                    if len(chunk) >= chunk_s:  # Calculated as nCr above
+                    if len(chunk) >= 125000:  # Chunk-size
                         res.append(p.apply_async(check_dist_list,
                                                  args=(molecule1, molecule2,
                                                        chunk, args.tolerance)))
