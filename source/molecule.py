@@ -4,6 +4,7 @@
 
 import math
 import itertools
+import scipy.misc as misc
 import numpy as np
 from typing import Optional
 from multiprocessing import Pool
@@ -520,64 +521,102 @@ class Molecule:
         return s
 
 
-def batch_identify_dihedrals(molecule, list_of_pairs, verbosity=0):
+def batch_identify_dihedrals(molecule, chunk_start, chunk_end, verbosity=0):
     results = []
-    for i in list_of_pairs:
-        if i[0][1] == i[1][0] and i[0][2] == i[1][1]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_atm_dihedral(i[0][0], i[0][1], i[1][1],
-                                                  i[1][2]))
-            results.append([i[0][0], i[0][1], i[1][1], i[1][2], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                        molecule.atm_symbol(i[0][0]), i[0][0],
-                        molecule.atm_symbol(i[0][1]), i[0][1],
-                        molecule.atm_symbol(i[1][1]), i[1][1],
-                        molecule.atm_symbol(i[1][2]), i[1][2], angle))
-        if i[0][1] == i[1][2] and i[0][2] == i[1][1]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_atm_dihedral(i[0][0], i[0][1],
-                                                  i[1][1],
-                                                  i[1][0]))
-            results.append([i[0][0], i[0][1], i[1][1], i[1][0], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                        molecule.atm_symbol(i[0][0]), i[0][0],
-                        molecule.atm_symbol(i[0][1]), i[0][1],
-                        molecule.atm_symbol(i[1][1]), i[1][1],
-                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
-        if i[0][1] == i[1][0] and i[0][0] == i[1][1]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_atm_dihedral(i[0][2], i[0][1],
-                                                  i[1][1],
-                                                  i[1][2]))
-            results.append([i[0][2], i[0][1], i[1][1], i[1][1], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                        molecule.atm_symbol(i[0][2]), i[0][2],
-                        molecule.atm_symbol(i[0][1]), i[0][1],
-                        molecule.atm_symbol(i[1][1]), i[1][1],
-                        molecule.atm_symbol(i[1][2]), i[1][2], angle))
-        if i[0][1] == i[1][2] and i[0][0] == i[1][1]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_atm_dihedral(i[0][2], i[0][1],
-                                                  i[1][1],
-                                                  i[1][0]))
-            results.append([i[0][2], i[0][1], i[1][1], i[1][0], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({: 7.2f}°)".format(
-                        molecule.atm_symbol(i[0][2]), i[0][2],
-                        molecule.atm_symbol(i[0][1]), i[0][1],
-                        molecule.atm_symbol(i[1][1]), i[1][1],
-                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
+    position = -1
+    for i, j in itertools.combinations(range(len(molecule.angles)), 2):
+        position += 1
+        if chunk_start <= position <= chunk_end:
+            if molecule.angles[i][1] == molecule.angles[j][0] and \
+                    molecule.angles[i][2] == molecule.angles[j][1]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_atm_dihedral(
+                        molecule.angles[i][0], molecule.angles[i][1],
+                        molecule.angles[j][1],
+                        molecule.angles[j][2]))
+                results.append(
+                    [molecule.angles[i][0], molecule.angles[i][1],
+                     molecule.angles[j][1], molecule.angles[j][2], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                            molecule.atm_symbol(molecule.angles[i][0]),
+                            molecule.angles[i][0],
+                            molecule.atm_symbol(molecule.angles[i][1]),
+                            molecule.angles[i][1],
+                            molecule.atm_symbol(molecule.angles[j][1]),
+                            molecule.angles[j][1],
+                            molecule.atm_symbol(molecule.angles[j][2]),
+                            molecule.angles[j][2], angle))
+            if molecule.angles[i][1] == molecule.angles[j][2] and \
+                    molecule.angles[i][2] == molecule.angles[j][1]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_atm_dihedral(
+                        molecule.angles[i][0], molecule.angles[i][1],
+                        molecule.angles[j][1],
+                        molecule.angles[j][0]))
+                results.append(
+                    [molecule.angles[i][0], molecule.angles[i][1],
+                     molecule.angles[j][1], molecule.angles[j][0], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                            molecule.atm_symbol(molecule.angles[i][0]),
+                            molecule.angles[i][0],
+                            molecule.atm_symbol(molecule.angles[i][1]),
+                            molecule.angles[i][1],
+                            molecule.atm_symbol(molecule.angles[j][1]),
+                            molecule.angles[j][1],
+                            molecule.atm_symbol(molecule.angles[j][0]),
+                            molecule.angles[j][0], angle))
+            if molecule.angles[i][1] == molecule.angles[j][0] and \
+                    molecule.angles[i][0] == molecule.angles[j][1]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_atm_dihedral(
+                        molecule.angles[i][2], molecule.angles[i][1],
+                        molecule.angles[j][1],
+                        molecule.angles[j][2]))
+                results.append(
+                    [molecule.angles[i][2], molecule.angles[i][1],
+                     molecule.angles[j][1], molecule.angles[j][1], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                            molecule.atm_symbol(molecule.angles[i][2]),
+                            molecule.angles[i][2],
+                            molecule.atm_symbol(molecule.angles[i][1]),
+                            molecule.angles[i][1],
+                            molecule.atm_symbol(molecule.angles[j][1]),
+                            molecule.angles[j][1],
+                            molecule.atm_symbol(molecule.angles[j][2]),
+                            molecule.angles[j][2], angle))
+            if molecule.angles[i][1] == molecule.angles[j][2] and \
+                    molecule.angles[i][0] == molecule.angles[j][1]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_atm_dihedral(
+                        molecule.angles[i][2], molecule.angles[i][1],
+                        molecule.angles[j][1],
+                        molecule.angles[j][0]))
+                results.append(
+                    [molecule.angles[i][2], molecule.angles[i][1],
+                     molecule.angles[j][1], molecule.angles[j][0], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({: 7.2f}°)".format(
+                            molecule.atm_symbol(molecule.angles[i][2]),
+                            molecule.angles[i][2],
+                            molecule.atm_symbol(molecule.angles[i][1]),
+                            molecule.angles[i][1],
+                            molecule.atm_symbol(molecule.angles[j][1]),
+                            molecule.angles[j][1],
+                            molecule.atm_symbol(molecule.angles[j][0]),
+                            molecule.angles[j][0], angle))
+        elif position > chunk_end:
+            break
     return results
 
 
@@ -613,20 +652,19 @@ def build_molecular_dihedrals(molecule, verbosity=0, deletefirst=True,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
+        number_of_ops = int(misc.comb(N=len(molecule.angles), k=2))
+        chunks = []
+        stepsize = number_of_ops // cpu_number
+        start = 0
+        for i in range(cpu_number):
+            chunks.append([start, start + stepsize])
+            start += stepsize
+        chunks[-1][1] = number_of_ops
         with Pool(processes=cpu_number) as p:
-            res = []  # Field for results
-            chunk = []  # Field for each chunk of parallel calculations
-            # number_of_ops = misc.comb(N=len(molecule.angles), k=2)
-            # This itertools.combination expression creates all pairs of bonds
-            for i in itertools.combinations(molecule.angles, 2):
-                chunk.append(list(i))
-                if len(chunk) >= 125000:  # Chunk-size
-                    res.append(p.apply_async(batch_identify_dihedrals,
-                                             args=(molecule,
-                                                   chunk, verbosity)))
-                    chunk = []
-            res.append(p.apply_async(batch_identify_dihedrals,
-                                     args=(molecule, chunk, verbosity)))
+            res = []
+            for i in chunks:
+                res.append(p.apply_async(batch_identify_dihedrals, args=(
+                    molecule, i[0], i[1], verbosity)))
             results = [p.get() for p in res]
         for i in results:
             for j in i:
@@ -649,53 +687,82 @@ def build_molecular_dihedrals(molecule, verbosity=0, deletefirst=True,
     return list_of_dihedrals
 
 
-def batch_identify_angles(molecule, list_of_pairs, verbosity=0):
+def batch_identify_angles(molecule, chunk_start, chunk_end, verbosity=0):
     results = []
-    for i in list_of_pairs:
-        if i[0][0] == i[1][0]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_angle(i[0][1], i[0][0], i[1][1]))
-            results.append([i[0][1], i[0][0], i[1][1], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                        molecule.atm_symbol(i[0][1]), i[0][1],
-                        molecule.atm_symbol(i[0][0]), i[0][0],
-                        molecule.atm_symbol(i[1][1]), i[1][1], angle))
-        if i[0][0] == i[1][1]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_angle(i[0][1], i[0][0], i[1][0]))
-            results.append([i[0][1], i[0][0], i[1][0], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                        molecule.atm_symbol(i[0][1]), i[0][1],
-                        molecule.atm_symbol(i[0][0]), i[0][0],
-                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
-        if i[0][1] == i[1][0]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_angle(i[0][0], i[1][0], i[1][1]))
-            results.append([i[0][0], i[1][0], i[1][1], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                        molecule.atm_symbol(i[0][0]), i[0][0],
-                        molecule.atm_symbol(i[1][0]), i[1][0],
-                        molecule.atm_symbol(i[1][1]), i[1][1], angle))
-        if i[0][1] == i[1][1]:
-            angle = math.degrees(
-                molecule.atm_atm_atm_angle(i[0][0], i[1][1], i[1][0]))
-            results.append([i[0][0], i[1][1], i[1][0], angle])
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}), {:<3} ({:3d})"
-                    " and {:<3} ({:3d}) ({:6.2f}°)".format(
-                        molecule.atm_symbol(i[0][0]), i[0][0],
-                        molecule.atm_symbol(i[1][1]), i[1][1],
-                        molecule.atm_symbol(i[1][0]), i[1][0], angle))
+    position = -1
+    for i, j in itertools.combinations(range(len(molecule.bonds)), 2):
+        position += 1
+        if chunk_start <= position <= chunk_end:
+            if molecule.bonds[i][0] == molecule.bonds[j][0]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_angle(molecule.bonds[i][1],
+                                               molecule.bonds[i][0],
+                                               molecule.bonds[j][1]))
+                results.append([molecule.bonds[i][1], molecule.bonds[i][0],
+                                molecule.bonds[j][1], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                            molecule.atm_symbol(molecule.bonds[i][1]),
+                            molecule.bonds[i][1],
+                            molecule.atm_symbol(molecule.bonds[i][0]),
+                            molecule.bonds[i][0],
+                            molecule.atm_symbol(molecule.bonds[j][1]),
+                            molecule.bonds[j][1], angle))
+            if molecule.bonds[i][0] == molecule.bonds[j][1]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_angle(molecule.bonds[i][1],
+                                               molecule.bonds[i][0],
+                                               molecule.bonds[j][0]))
+                results.append([molecule.bonds[i][1], molecule.bonds[i][0],
+                                molecule.bonds[j][0], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                            molecule.atm_symbol(molecule.bonds[i][1]),
+                            molecule.bonds[i][1],
+                            molecule.atm_symbol(molecule.bonds[i][0]),
+                            molecule.bonds[i][0],
+                            molecule.atm_symbol(molecule.bonds[j][0]),
+                            molecule.bonds[j][0], angle))
+            if molecule.bonds[i][1] == molecule.bonds[j][0]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_angle(molecule.bonds[i][0],
+                                               molecule.bonds[j][0],
+                                               molecule.bonds[j][1]))
+                results.append([molecule.bonds[i][0], molecule.bonds[j][0],
+                                molecule.bonds[j][1], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                            molecule.atm_symbol(molecule.bonds[i][0]),
+                            molecule.bonds[i][0],
+                            molecule.atm_symbol(molecule.bonds[j][0]),
+                            molecule.bonds[j][0],
+                            molecule.atm_symbol(molecule.bonds[j][1]),
+                            molecule.bonds[j][1], angle))
+            if molecule.bonds[i][1] == molecule.bonds[j][1]:
+                angle = math.degrees(
+                    molecule.atm_atm_atm_angle(molecule.bonds[i][0],
+                                               molecule.bonds[j][1],
+                                               molecule.bonds[j][0]))
+                results.append([molecule.bonds[i][0], molecule.bonds[j][1],
+                                molecule.bonds[j][0], angle])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d})"
+                        " and {:<3} ({:3d}) ({:6.2f}°)".format(
+                            molecule.atm_symbol(molecule.bonds[i][0]),
+                            molecule.bonds[i][0],
+                            molecule.atm_symbol(molecule.bonds[j][1]),
+                            molecule.bonds[j][1],
+                            molecule.atm_symbol(molecule.bonds[j][0]),
+                            molecule.bonds[j][0], angle))
+        elif position > chunk_end:
+            break
     return results
 
 
@@ -731,20 +798,19 @@ def build_molecular_angles(molecule, verbosity=0, deletefirst=True,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
+        number_of_ops = int(misc.comb(N=len(molecule.bonds), k=2))
+        chunks = []
+        stepsize = number_of_ops // cpu_number
+        start = 0
+        for i in range(cpu_number):
+            chunks.append([start, start + stepsize])
+            start += stepsize
+        chunks[-1][1] = number_of_ops
         with Pool(processes=cpu_number) as p:
             res = []
-            chunk = []
-            # number_of_ops = misc.comb(N=len(molecule.bonds), k=2)
-            # This itertools.combination expression creates all pairs of bonds
-            for i in itertools.combinations(molecule.bonds, 2):
-                chunk.append(list(i))
-                if len(chunk) >= 125000:  # Chunk-size
-                    res.append(p.apply_async(batch_identify_angles,
-                                             args=(molecule,
-                                                   chunk, verbosity)))
-                    chunk = []
-            res.append(p.apply_async(batch_identify_angles,
-                                     args=(molecule, chunk, verbosity)))
+            for i in chunks:
+                res.append(p.apply_async(batch_identify_angles, args=(
+                    molecule, i[0], i[1], verbosity)))
             results = [p.get() for p in res]
         for i in results:
             for j in i:
@@ -765,22 +831,28 @@ def build_molecular_angles(molecule, verbosity=0, deletefirst=True,
     return list_of_bond_angles
 
 
-def batch_compare_distances(molecule, list_of_pairs, tolerance, verbosity=0):
+def batch_compare_distances(molecule, chunk_start, chunk_end, tolerance,
+                            verbosity=0):
     results = []
-    for i in list_of_pairs:
-        distance = molecule.atm_atm_dist(i[0], i[1])
-        if distance <= (
-                symbol_to_covalent_radius[molecule.atm_symbol(i[0])] +
-                symbol_to_covalent_radius[
-                    molecule.atm_symbol(i[1])]) * tolerance:
-            if verbosity >= 3:
-                print(
-                    " {:<3} ({:3d}) and {:<3} ({:3d})"
-                    " (Distance: {:.3f} Å)".format(
-                        molecule.atm_symbol(i[0]), i[0],
-                        molecule.atm_symbol(i[1]), i[1],
-                        distance))
-            results.append([i[0], i[1], distance])
+    position = -1
+    for i, j in itertools.combinations(range(molecule.num_atoms()), 2):
+        position += 1
+        if chunk_start <= position <= chunk_end:
+            distance = molecule.atm_atm_dist(i, j)
+            if distance <= (
+                    symbol_to_covalent_radius[molecule.atm_symbol(i)] +
+                    symbol_to_covalent_radius[
+                        molecule.atm_symbol(j)]) * tolerance:
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}) and {:<3} ({:3d})"
+                        " (Distance: {:.3f} Å)".format(
+                            molecule.atm_symbol(i), i,
+                            molecule.atm_symbol(j), j,
+                            distance))
+                results.append([i, j, distance])
+        elif position > chunk_end:
+            break
     return results
 
 
@@ -853,21 +925,20 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
+        number_of_ops = int(misc.comb(N=molecule.num_atoms(), k=2))
+        chunks = []
+        stepsize = number_of_ops // cpu_number
+        start = 0
+        for i in range(cpu_number):
+            chunks.append([start, start + stepsize])
+            start += stepsize
+        chunks[-1][1] = number_of_ops
         with Pool(processes=cpu_number) as p:
             res = []
-            chunk = []
-            # number_of_ops = misc.comb(N=molecule.num_atoms(), k=2)
-            # This itertools.combination expression creates all pairs of atoms
-            for i in itertools.combinations(range(0, molecule.num_atoms()), 2):
-                chunk.append(list(i))
-                if len(chunk) >= 125000:  # Chunk-size
-                    res.append(p.apply_async(batch_compare_distances,
-                                             args=(molecule, chunk,
-                                                   distfactor, verbosity)))
-                    chunk = []
-            res.append(p.apply_async(batch_compare_distances,
-                                     args=(molecule, chunk,
-                                           distfactor, verbosity)))
+            for i in chunks:
+                res.append(p.apply_async(batch_compare_distances,
+                                         args=(molecule, i[0], i[1],
+                                               distfactor, verbosity)))
             results = [p.get() for p in res]
         for i in results:
             for j in i:
