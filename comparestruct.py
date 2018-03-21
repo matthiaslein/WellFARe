@@ -7,6 +7,7 @@
 import argparse
 import math
 import itertools
+import scipy.misc as misc
 from multiprocessing import Pool, cpu_count
 
 from messages import *
@@ -15,25 +16,17 @@ from molecule import Molecule, build_molecular_dihedrals, \
 from qmparser import extract_molecular_data
 
 
-def check_dist_diff(first_molecule, second_molecule, a, b, toler):
-    # print("Checking atoms {} and {}.".format(i,j))
-    dist1 = first_molecule.atm_atm_dist(a, b)
-    if dist1 <= 10.0:
-        dist2 = second_molecule.atm_atm_dist(a, b)
-        distdiff = math.fabs(dist1 - dist2)
-    else:
-        distdiff = 0.0
-    tolerance = (10 ** (-1.0 * toler)) * dist1
-    if distdiff != 0.0 and distdiff >= tolerance:
-        return False
-    return True
-
-
-def check_dist_list(molecule_a, molecule_b, list_of_pairs, toler):
-    # print(list)
-    for pair in list_of_pairs:
-        if not check_dist_diff(molecule_a, molecule_b, pair[0], pair[1],
-                               toler):
+def check_dist_list(molecule_a, molecule_b, chunk_start, chunk_end, toler):
+    iterator = itertools.combinations(range(molecule_a.num_atoms()), 2)
+    for i, j in itertools.islice(iterator, chunk_start, chunk_end):
+        dist1 = molecule_a.atm_atm_dist(i, j)
+        tolerance = (10 ** (-1.0 * toler)) * dist1
+        if dist1 <= 10.0:
+            dist2 = molecule_b.atm_atm_dist(i, j)
+            distdiff = math.fabs(dist1 - dist2)
+        else:
+            continue
+        if distdiff >= tolerance:
             return False
     return True
 
@@ -290,41 +283,31 @@ def main():
             if args.verbosity >= 3:
                 print(
                     "\nStarting serial execution on a single processor core.")
-            for i in range(0, molecule1.num_atoms()):
-                for j in range(i + 1, molecule1.num_atoms()):
-                    if check_dist_diff(molecule1, molecule2, i, j,
-                                       args.tolerance) is False:
-                        if args.verbosity >= 2:
-                            print("Mismatch in local distance matrix.")
-                        if args.verbosity >= 1:
-                            msg_program_footer(prg_start_time)
-                        sys.exit(-1)
         else:
             if args.verbosity >= 3:
                 print(
                     "\nStarting parallel execution on {} processor"
                     " cores.".format(args.numproc))
-            with Pool(processes=args.numproc) as p:
-                res = []
-                chunk = []
-                # number_of_ops = misc.comb(N=molecule1.num_atoms(), k=2)
-                # This itertools.combination expression creates all
-                # pairs of atoms
-                for i in itertools.combinations(
-                        range(0, molecule1.num_atoms()), 2):
-                    chunk.append(list(i))
-                    if len(chunk) >= 125000:  # Chunk-size
-                        res.append(p.apply_async(check_dist_list,
-                                                 args=(molecule1, molecule2,
-                                                       chunk, args.tolerance)))
-                        chunk = []
-                results = [p.get() for p in res]
-            if False in results:
-                if args.verbosity >= 2:
-                    print("Mismatch in local distance matrix.")
-                if args.verbosity >= 1:
-                    msg_program_footer(prg_start_time)
-                sys.exit(-1)
+        number_of_ops = int(misc.comb(N=molecule1.num_atoms(), k=2))
+        chunks = []
+        stepsize = number_of_ops // args.numproc
+        start = -1
+        for i in range(args.numproc):
+            chunks.append([start + 1, start + stepsize])
+            start += stepsize
+        chunks[-1][1] = number_of_ops
+        with Pool(processes=args.numproc) as p:
+            res = []
+            for i in chunks:
+                res.append(p.apply_async(check_dist_list, args=(
+                    molecule1, molecule2, i[0], i[1], args.tolerance)))
+            results = [p.get() for p in res]
+        if False in results:
+            if args.verbosity >= 2:
+                print("Mismatch in local distance matrix.")
+            if args.verbosity >= 1:
+                msg_program_footer(prg_start_time)
+            sys.exit(-1)
 
         if args.verbosity >= 3:
             print("\nIdentical distance matrices.")
