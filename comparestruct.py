@@ -8,15 +8,18 @@ import argparse
 import math
 import itertools
 import scipy.misc as misc
-from multiprocessing import Pool, cpu_count
 
-from messages import *
+from multiprocessing import cpu_count
+from parallelisation import EmbarrassingParallelisation
+from messages import msg_program_header, msg_program_footer, msg_timestamp
+
 from molecule import Molecule, build_molecular_dihedrals, \
     build_molecular_angles, build_bond_orders
 from qmparser import extract_molecular_data
 
 
 def check_dist_list(molecule_a, molecule_b, chunk_start, chunk_end, toler):
+
     iterator = itertools.combinations(range(molecule_a.num_atoms()), 2)
     for i, j in itertools.islice(iterator, chunk_start, chunk_end):
         dist1 = molecule_a.atm_atm_dist(i, j)
@@ -288,19 +291,14 @@ def main():
                 print(
                     "\nStarting parallel execution on {} processor"
                     " cores.".format(args.numproc))
-        number_of_ops = int(misc.comb(N=molecule1.num_atoms(), k=2))
-        chunks = []
-        stepsize = number_of_ops // args.numproc
-        start = -1
-        for i in range(args.numproc):
-            chunks.append([start + 1, start + stepsize])
-            start += stepsize
-        chunks[-1][1] = number_of_ops
-        with Pool(processes=args.numproc) as p:
+        number_of_pairs = int(misc.comb(N=molecule1.num_atoms(), k=2))
+        with EmbarrassingParallelisation(number_of_processes=args.numproc,
+                                         number_of_ops=number_of_pairs) as pe:
             res = []
-            for i in chunks:
-                res.append(p.apply_async(check_dist_list, args=(
-                    molecule1, molecule2, i[0], i[1], args.tolerance)))
+            for chunk in pe.chunks:
+                res.append(pe.pool.apply_async(check_dist_list, args=(
+                    molecule1, molecule2, chunk.start, chunk.finish,
+                    args.tolerance)))
             results = [p.get() for p in res]
         if False in results:
             if args.verbosity >= 2:

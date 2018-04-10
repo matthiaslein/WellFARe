@@ -7,11 +7,11 @@ import itertools
 import scipy.misc as misc
 import numpy as np
 from typing import Optional
-from multiprocessing import Pool
 
 from atom import Atom
 from constants import symbol_to_mass, symbol_to_covalent_radius
-from messages import *
+from messages import msg_program_error
+from parallelisation import EmbarrassingParallelisation
 
 
 class Molecule:
@@ -648,19 +648,13 @@ def build_molecular_dihedrals(molecule, verbosity=0, deletefirst=True,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
-        number_of_ops = int(misc.comb(N=len(molecule.angles), k=2))
-        chunks = []
-        stepsize = number_of_ops // cpu_number
-        start = -1
-        for i in range(cpu_number):
-            chunks.append([start + 1, start + stepsize])
-            start += stepsize
-        chunks[-1][1] = number_of_ops
-        with Pool(processes=cpu_number) as p:
+        number_of_pairs = int(misc.comb(N=len(molecule.angles), k=2))
+        with EmbarrassingParallelisation(number_of_processes=cpu_number,
+                                         number_of_ops=number_of_pairs) as pe:
             res = []
-            for i in chunks:
-                res.append(p.apply_async(batch_identify_dihedrals, args=(
-                    molecule, i[0], i[1], verbosity)))
+            for chunk in pe.chunks:
+                res.append(pe.pool.apply_async(batch_identify_dihedrals, args=(
+                    molecule, chunk.start, chunk.finish, verbosity)))
             results = [p.get() for p in res]
         for i in results:
             for j in i:
@@ -790,19 +784,14 @@ def build_molecular_angles(molecule, verbosity=0, deletefirst=True,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
-        number_of_ops = int(misc.comb(N=len(molecule.bonds), k=2))
-        chunks = []
-        stepsize = number_of_ops // cpu_number
-        start = -1
-        for i in range(cpu_number):
-            chunks.append([start + 1, start + stepsize])
-            start += stepsize
-        chunks[-1][1] = number_of_ops
-        with Pool(processes=cpu_number) as p:
+        number_of_pairs = int(misc.comb(N=len(molecule.bonds), k=2))
+        with EmbarrassingParallelisation(number_of_processes=cpu_number,
+                                         number_of_ops=number_of_pairs) as pe:
             res = []
-            for i in chunks:
-                res.append(p.apply_async(batch_identify_angles, args=(
-                    molecule, i[0], i[1], verbosity)))
+            for chunk in pe.chunks:
+                res.append(pe.pool.apply_async(batch_identify_angles,
+                                               args=(molecule, chunk.start,
+                                                     chunk.finish, verbosity)))
             results = [p.get() for p in res]
         for i in results:
             for j in i:
@@ -913,20 +902,15 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
-        number_of_ops = int(misc.comb(N=molecule.num_atoms(), k=2))
-        chunks = []
-        stepsize = number_of_ops // cpu_number
-        start = -1
-        for i in range(cpu_number):
-            chunks.append([start + 1, start + stepsize])
-            start += stepsize
-        chunks[-1][1] = number_of_ops
-        with Pool(processes=cpu_number) as p:
+        number_of_pairs = int(misc.comb(N=molecule.num_atoms(), k=2))
+        with EmbarrassingParallelisation(number_of_processes=cpu_number,
+                                         number_of_ops=number_of_pairs) as pe:
             res = []
-            for i in chunks:
-                res.append(p.apply_async(batch_compare_distances,
-                                         args=(molecule, i[0], i[1],
-                                               distfactor, verbosity)))
+            for chunk in pe.chunks:
+                res.append(pe.pool.apply_async(batch_compare_distances,
+                                               args=(molecule, chunk.start,
+                                                     chunk.finish,
+                                                     distfactor, verbosity)))
             results = [p.get() for p in res]
         for i in results:
             for j in i:
