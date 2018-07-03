@@ -666,7 +666,7 @@ def main():
     # Print GPL v3 statement and program header
     prg_start_time = time.time()
     if args.verbosity >= 1:
-        msg_program_header("MICEPES", 1.0)
+        msg_program_header("MInCEPiES", 1.0)
 
     molecule = Molecule("Input Structure", 0)
 

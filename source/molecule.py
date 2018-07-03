@@ -41,7 +41,26 @@ class Molecule:
         self.bonds = []  # Initially an empty list
         self.angles = []  # Initially an empty list
         self.dihedrals = []  # Initially an empty list
-        self.qm_energy = 0.0  # Initially set to zero
+        self.H_QM = np.zeros((3,
+                              3))  # Force constants, Array size arbitrary, just a placeholder for type
+        self.H_mw = np.zeros((3,
+                              3))  # Mass weighted force constants, Array size arbitrary, just a placeholder for type
+        self.frequencies = []  # List of vibrational frequencies in cm ⁻¹
+        self.sigmaRot = 1  # Rotational symmetry number
+        self.qm_energy = 0.0  # electronic energy in Hartree
+        self.ZPVE = 0.0  # Zero Point Vibrational Energy in Hartree
+        self.ZPVEList = []  # List of individual vibrations' contributions to the ZPVE in Hartree
+        self.thermVib = 0.0  # Finite temperature vibrational contribution in Hartree
+        self.thermVibList = []  # List of contributions from individual vibrations in Hartree
+        self.thermRot = 0.0  # Thermal contribution from rotations in Hartree
+        self.thermTrans = 0.0  # Thermal contribution from translation in Hartree
+        self.kT = 0.0  # Thermal contribution (from pV = kT) to Enthalpy in Hartree
+        self.transS = 0.0  # Translational entropy in J mol⁻¹ K⁻¹
+        self.elecS = 0.0  # Electronic entropy in J mol⁻¹ K⁻¹
+        self.rotS = 0.0  # Rotational entropy in J mol⁻¹ K⁻¹
+        self.vibS = 0.0  # Vibrational entropy in J mol⁻¹ K⁻¹
+        self.VibSList = []  # List of individual vibrations' contributions to the entropy in J mol⁻¹ K⁻¹
+        self.negTS = 0.0  # Thermal contribution (from -TS) to Gibbs energy in Hartree
 
     def __str__(self) -> str:
         """
@@ -73,6 +92,7 @@ class Molecule:
         return '({0}, {1}, {2}, ({3}))'.format(self.name, self.charge,
                                                self.mult, res)
 
+
     def mass(self) -> float:
         """
 
@@ -85,6 +105,7 @@ class Molecule:
 
         return mass
 
+
     def num_atoms(self) -> int:
         """
 
@@ -92,6 +113,7 @@ class Molecule:
         """
 
         return int(len(self.atoms))
+
 
     def add_atom(self, a: Atom, verbosity: int = 0) -> None:
         """
@@ -115,6 +137,7 @@ class Molecule:
             print(" adding {:<3} {: 13.8f} {: 13.8f} {: 13.8f} to {}".format(
                 a.symbol(), a.xpos(), a.ypos(), a.zpos(), self.name))
 
+
     def ch_atom(self, n: int, at: Atom) -> None:
         """
         Exchanges the nth atom of the Molecule with a new atom.
@@ -125,6 +148,7 @@ class Molecule:
         """
 
         self.atoms[n] = at
+
 
     def mov_atom(self, n: int, x: float, y: float, z: float) -> None:
         """
@@ -141,6 +165,7 @@ class Molecule:
         self.atoms[n].set_x(x)
         self.atoms[n].set_y(y)
         self.atoms[n].set_z(z)
+
 
     def add_bond(self, a: int, b: int) -> None:
         """
@@ -172,6 +197,7 @@ class Molecule:
                 self.atoms) and b <= len(self.atoms) and c != d:
             self.bonds.append([c, d])
 
+
     def del_bond(self, a: int, b: int) -> None:
         """
         Deletes the bond between atoms a and b from the list of bonds.
@@ -199,6 +225,7 @@ class Molecule:
         if exists is True:
             self.bonds.remove([c, d])
 
+
     def add_angle(self, a: int, b: int, c: int) -> None:
         """
         Adds an angle between atoms a, b and c to the list of angles.
@@ -220,6 +247,7 @@ class Molecule:
                 a <= len(self.atoms) and b <= len(self.atoms) and \
                 c <= len(self.atoms) and a != b and a != c and b != c:
             self.angles.append([a, b, c])
+
 
     def add_dihedral(self, a: int, b: int, c: int, d: int) -> None:
         """
@@ -247,6 +275,7 @@ class Molecule:
                 a != b and a != c and a != d and b != c and b != d and c != d:
             self.dihedrals.append([a, b, c, d])
 
+
     def atm_symbol(self, i: int) -> str:
         """
         Report the atomic symbol of atom i.
@@ -255,6 +284,7 @@ class Molecule:
         :return: The atom's atomic symbol
         """
         return self.atoms[i].symbol()
+
 
     def atm_pos_x(self, i: int) -> float:
         """
@@ -265,6 +295,7 @@ class Molecule:
         """
         return self.atoms[i].coord[0]
 
+
     def atm_pos_y(self, i: int) -> float:
         """
         Report the y-coordinate of atom i in Ångströms.
@@ -274,6 +305,7 @@ class Molecule:
         """
         return self.atoms[i].coord[1]
 
+
     def atm_pos_z(self, i: int) -> float:
         """
         Report the z-coordinate of atom i in Ångströms.
@@ -282,6 +314,7 @@ class Molecule:
         :return: The atoms z-coordinate in Ångströms.
         """
         return self.atoms[i].coord[2]
+
 
     def atm_atm_dist(self, i: int, j: int) -> float:
         """
@@ -301,6 +334,7 @@ class Molecule:
 
         return math.sqrt(distance)
 
+
     def bond_dist(self, i: int) -> float:
         """
         Report the distance between two atoms in the bonds list in Ångström.
@@ -314,6 +348,7 @@ class Molecule:
         distance = self.atm_atm_dist(atom1, atom2)
 
         return distance
+
 
     def atm_atm_atm_angle(self, i: int, j: int, k: int) -> float:
         """
@@ -343,6 +378,7 @@ class Molecule:
 
         return theta
 
+
     def bond_angle(self, i: int) -> float:
         """
         Report the angle described by three atoms in the bonds list in radians.
@@ -356,6 +392,7 @@ class Molecule:
         angle = self.atm_atm_atm_angle(atom1, atom2, atom3)
 
         return angle
+
 
     def atm_atm_atm_atm_dihedral(self, i: int, j: int, k: int,
                                  l: int) -> float:
@@ -416,6 +453,15 @@ class Molecule:
 
         return dihedral
 
+
+    def set_hessian(self, H):
+        """ (Molecule) -> NoneType
+
+        Set the Quantum Mechanically calculated Hessian, H_QM, equal to H
+        """
+        self.H_QM = H
+
+
     def set_mult(self, multiplicity: int) -> None:
         """
         Set the multiplicity of the molecule to M
@@ -426,6 +472,19 @@ class Molecule:
         """
 
         self.mult = multiplicity
+
+
+    def set_charge(self, charge: int) -> None:
+        """
+        Set the charge of the molecule to C
+
+        :param charge: Value of the charge (i.e. -1 for a singly charged anion,
+                                           2 for a doubly charged cation...)
+        :return: None
+        """
+
+        self.charge = charge
+
 
     def print_mol(self, output: str = "cart", comment: Optional[str] = None,
                   file: Optional[str] = None) -> str:

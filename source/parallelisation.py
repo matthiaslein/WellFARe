@@ -10,7 +10,9 @@ class EmbarrassingParallelisation:
     """
 
     def __init__(self, number_of_processes, number_of_ops, verbosity=0):
-        if number_of_processes > cpu_count():
+        # Default to using all cores if either too many or "-1" are
+        # specified.
+        if number_of_processes > cpu_count() or number_of_processes == -1:
             number_of_processes = cpu_count()
         if verbosity >= 3:
             print(

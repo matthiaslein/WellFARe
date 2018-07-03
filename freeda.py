@@ -13,7 +13,7 @@ from multiprocessing import Pool, cpu_count
 from messages import *
 from molecule import Molecule
 from qmparser import extract_molecular_data
-from thermochemistry import ThermodynamicState, thermochemical_analysis
+from thermochemistry import thermochemical_analysis
 
 
 
@@ -42,7 +42,7 @@ def thermochemical_comparison(reactants, products, temp=298.15, press=101325.0,
     rSum_negTS = 0.0
     for i in reactants:
         rSumMass += i.mass()
-        rSum_Ee += i.Ee_QM
+        rSum_Ee += i.qm_energy
         rSum_ZPVE += i.ZPVE
         rSum_thermVib += i.thermVib
         rSum_thermRot += i.thermRot
@@ -72,7 +72,7 @@ def thermochemical_comparison(reactants, products, temp=298.15, press=101325.0,
     pSum_negTS = 0.0
     for i in products:
         pSumMass += i.mass()
-        pSum_Ee += i.Ee_QM
+        pSum_Ee += i.qm_energy
         pSum_ZPVE += i.ZPVE
         pSum_thermVib += i.thermVib
         pSum_thermRot += i.thermRot
@@ -322,30 +322,40 @@ def thermochemical_comparison(reactants, products, temp=298.15, press=101325.0,
 
 parser = argparse.ArgumentParser(
     description="freeda: Free Energy Decomposition Analysis",
-    epilog="recognised filetypes: gaussian, orca, turbomole")
+    epilog="recognised filetypes: gaussian, orca, turbomole, adf")
 parser.add_argument("-P", "--numproc", type=int, help="number of processes "
                                                       "for parallel execution",
                     default="0")
 parser.add_argument("--temperature", type=float, help="Temperature (in Kelvin)"
                                                       " for the thermochemical"
-                                                      " analysis",
+                                                      " analysis. Default is"
+                                                      " 298.15 K",
                     default="298.15")
 parser.add_argument("--pressure", type=float,
-                    help="Pressure (in Pa) for the thermochemical analysis",
+                    help="Pressure (in Pa) for the thermochemical analysis."
+                         " Default is 101325 Pa.",
                     default="101325.0")
 parser.add_argument("--scalefreq", type=float,
-                    help="Scale harmonic frequencies by a constant factor",
+                    help="Scale harmonic frequencies by a constant factor."
+                         " Default is 1.0, i.e. no scaling.",
                     default="1.0")
+parser.add_argument("-i", "--internal",
+                    help="method for treating internal rotations. Can either"
+                         " be cet to 'none' for no treatment, or to 'truhlar'"
+                         " to set all vibrational frequencies below 100 cm⁻¹"
+                         " to exactly 100⁻¹. Default is 'truhlar'.",
+                    choices=["none", "truhlar"],
+                    default="truhlar")
 parser.add_argument("-a", "--analysis",
-                    help="For single compounds, analyse contributions"
-                         " from each vibrational mode", action='store_true')
+                    help="For single compounds, print contributions"
+                         " from each vibrational mode.", action='store_true')
 parser.add_argument("-r", "--reactants", metavar='file', nargs='+',
                     help="input file(s) with qc data of the reactant(s)",
                     required=True)
 parser.add_argument("-p", "--products", metavar='file', nargs='+',
                     help="input file(s) with qc data of the product(s)")
 parser.add_argument("-v", "--verbosity", help="increase output verbosity",
-                    type=int, choices=[0, 1, 2, 3], default=0)
+                    type=int, choices=[0, 1, 2, 3], default=1)
 
 args = parser.parse_args()
 
@@ -373,9 +383,13 @@ def main():
         extract_molecular_data(args.reactants, list_of_reactants[-1],
                                verbosity=args.verbosity, read_coordinates=True,
                                read_bond_orders=True, build_angles=True,
-                               build_dihedrals=True, cpu_number=args.numproc)
+                               build_dihedrals=True, read_force_constants=True,
+                               read_multiplicity=True, read_qm_energy=True,
+                               read_rotational_symmetry_number=True,
+                               cpu_number=args.numproc)
         thermochemical_analysis(list_of_reactants[-1], temp=args.temperature,
                                 press=args.pressure, scalefreq=args.scalefreq,
+                                internal=args.internal,
                                 verbosity=args.verbosity)
     else:
         for i in args.reactants:
@@ -385,11 +399,15 @@ def main():
                                    read_coordinates=True,
                                    read_bond_orders=True, build_angles=True,
                                    build_dihedrals=True,
+                                   read_force_constants=True,
+                                   read_multiplicity=True, read_qm_energy=True,
+                                   read_rotational_symmetry_number=True,
                                    cpu_number=args.numproc)
             thermochemical_analysis(list_of_reactants[-1],
                                     temp=args.temperature,
                                     press=args.pressure,
                                     scalefreq=args.scalefreq,
+                                    internal=args.internal,
                                     verbosity=args.verbosity)
 
     list_of_products = []
@@ -398,9 +416,13 @@ def main():
         extract_molecular_data(args.products, list_of_products[-1],
                                verbosity=args.verbosity, read_coordinates=True,
                                read_bond_orders=True, build_angles=True,
-                               build_dihedrals=True, cpu_number=args.numproc)
+                               build_dihedrals=True, read_force_constants=True,
+                               read_multiplicity=True, read_qm_energy=True,
+                               read_rotational_symmetry_number=True,
+                               cpu_number=args.numproc)
         thermochemical_analysis(list_of_products[-1], temp=args.temperature,
                                 press=args.pressure, scalefreq=args.scalefreq,
+                                internal=args.internal,
                                 verbosity=args.verbosity)
     elif args.products is not None:
         for i in args.products:
@@ -410,10 +432,14 @@ def main():
                                    read_coordinates=True,
                                    read_bond_orders=True, build_angles=True,
                                    build_dihedrals=True,
+                                   read_force_constants=True,
+                                   read_multiplicity=True, read_qm_energy=True,
+                                   read_rotational_symmetry_number=True,
                                    cpu_number=args.numproc)
             thermochemical_analysis(list_of_products[-1], temp=args.temperature,
                                     press=args.pressure,
                                     scalefreq=args.scalefreq,
+                                    internal=args.internal,
                                     verbosity=args.verbosity)
     else:
         if args.verbosity >= 1:

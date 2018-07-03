@@ -6,6 +6,8 @@
 
 import argparse
 import math
+import time
+import sys
 import itertools
 import scipy.misc as misc
 
@@ -43,7 +45,7 @@ def check_dist_list(molecule_a, molecule_b, chunk_start, chunk_end, toler):
 parser = argparse.ArgumentParser(
     description="comparestructures: Determines if two input structures"
                 " represent the same molecule.",
-    epilog="recognised filetypes: gaussian, orca, turbomole, xyz")
+    epilog="recognised filetypes: gaussian, orca, adf, turbomole, xyz")
 parser.add_argument("-v", "--verbosity", help="increase output verbosity",
                     type=int, choices=[0, 1, 2, 3, 4], default=0)
 parser.add_argument("-t", "--tolerance",
@@ -85,11 +87,11 @@ def main():
 
     molecule1 = Molecule("Molecule 1", 0)
     extract_molecular_data(args.file1, molecule1, read_bond_orders=False,
-                           verbosity=0)
+                           verbosity=3)
 
     molecule2 = Molecule("Molecule 2", 0)
     extract_molecular_data(args.file2, molecule2, read_bond_orders=False,
-                           verbosity=0)
+                           verbosity=3)
 
     #################################
     # Tests for identity start here #

@@ -9,81 +9,6 @@ from conversions import *
 from constants import *
 
 
-class ThermodynamicState:
-    """The thermochemical state of a molecule"""
-
-    def __init__(self, compound: Molecule, temperature: Optional[float] = 298.15,
-                 pressure: Optional[float] = 101325.0) -> None:
-        """
-        Creates an object that describes the thermodynamic state of a compound,
-        a Molecule object, defined by the temperature and pressure.
-
-        :param compound: The molecule that defines the compound.
-        :param temperature: The temperature (in Kelvin) of the state.
-        :param pressure: The pressure (in Pa) of the state.
-        """
-
-        self.compound = compound
-        self.temperature = temperature
-        self.pressure = pressure
-
-        # Force constants, Array size arbitrary, just a placeholder for type
-        self.H_QM = np.zeros((3, 3))
-
-        # Mass weighted force constants, Array size arbitrary, just a placeholder for type
-        self.H_mw = np.zeros((3, 3))
-
-        # List of vibrational frequencies in cm ⁻¹
-        self.frequencies = []
-
-        # Rotational symmetry number
-        self.sigmaRot = 1
-
-        # electronic energy in Hartree
-        self.Ee_QM = 0.0
-
-        # Zero Point Vibrational Energy in Hartree
-        self.ZPVE = 0.0
-
-        # List of individual vibrations' contributions to the ZPVE in Hartree
-        self.ZPVEList = []
-
-        # Finite temperature vibrational contribution in Hartree
-        self.thermVib = 0.0
-
-        # List of contributions from individual vibrations in Hartree
-        self.thermVibList = []
-
-        # Thermal contribution from rotations in Hartree
-        self.thermRot = 0.0
-
-        # Thermal contribution from translation in Hartree
-        self.thermTrans = 0.0
-
-        # Thermal contribution (from pV = kT) to Enthalpy in Hartree
-        self.kT = 0.0
-
-        # Translational entropy in J mol⁻¹ K⁻¹
-        self.transS = 0.0
-
-        # Electronic entropy in J mol⁻¹ K⁻¹
-        self.elecS = 0.0
-
-        # Rotational entropy in J mol⁻¹ K⁻¹
-        self.rotS = 0.0
-
-        # Vibrational entropy in J mol⁻¹ K⁻¹
-        self.vibS = 0.0
-
-        # List of individual vibrations' contributions to S in J mol⁻¹ K⁻¹
-        self.VibSList = []
-
-        # Thermal contribution (from -TS) to Gibbs energy in Hartree
-        self.negTS = 0.0
-
-    pass
-
-
 ###############################################################################
 #                                                                             #
 # This is the part of the program where the vibrational analysis is done      #
@@ -91,7 +16,7 @@ class ThermodynamicState:
 ###############################################################################
 
 def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
-                            scalefreq=1.0, verbosity=0):
+                            scalefreq=1.0, internal="truhlar", verbosity=0):
     # Constants
     # k_boltz() = 1.38064852E-23  # Boltzmann constant in JK⁻¹
     # h_planck() = 6.626070040E-34  # Planck constant in Js
@@ -257,7 +182,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                 molecule.rotS))
 
     if molecule.num_atoms() != 1 and (
-            molecule.frequencies != [] or molecule.H_QM != []):
+            molecule.H_QM != [] or molecule.frequencies != []):
         # If we didn't read frequencies from file, calculate them from force constants
         if molecule.frequencies == []:
             if verbosity >= 2:
@@ -272,9 +197,9 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                                 molecule.H_QM[3 * i + h][
                                     3 * j + l] / math.sqrt(
                                     symbol_to_au_mass[
-                                        molecule.atoms[i].symbol] *
+                                        molecule.atm_symbol(i)] *
                                     symbol_to_au_mass[
-                                        molecule.atoms[j].symbol])
+                                        molecule.atm_symbol(j)])
             frequencies, normalModes = np.linalg.eig(molecule.H_mw)
 
             # We need to distinguish two cases: (1) linear molecule with 3N-5 vibrations and (2) non-linear
@@ -304,6 +229,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                     else:
                         sign = 1
                     i = sign * math.sqrt(abs(i)) * conversion
+
                     # We don't add imaginary modes to the thermochemical analysis
                     if sign == 1:
                         listOfFreqs.append(i)
@@ -333,6 +259,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                     else:
                         sign = 1
                     i = sign * math.sqrt(abs(i)) * conversion
+
                     # We don't add imaginary modes to the thermochemical analysis
                     if sign == 1:
                         listOfFreqs.append(i)
@@ -362,6 +289,20 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                             listOfFreqs[
                                 i] * scalefreq))
                 listOfFreqs[i] = listOfFreqs[i] * scalefreq
+
+        # Following Truhlar's advice, very low frequencies (below
+        # 100 cm⁻¹) should be fixed to exactly 100 cm⁻¹. We check
+        # if this option is selected and then proceed:
+        if internal == "truhlar":
+            if verbosity >= 1:
+                print("\n Fixing all low frequencies to 100 cm⁻¹")
+            for i in range(0, len(listOfFreqs)):
+                if 0.0 < listOfFreqs[i] < 100.0:
+                    if verbosity >= 1:
+                        print(
+                            " Vibration {} Before: {:> 9.2f} cm⁻¹,"
+                            " After: 100 cm⁻¹".format(i + 1, listOfFreqs[i]))
+                    listOfFreqs[i] = 100.0
 
         # Then, create a list that contains all vibrational temperatures (makes the summation of the
         # partition function simpler/more convenient)
@@ -417,7 +358,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
     molecule.thermRot = (e_rot / 2625500.2)
     molecule.thermVib = (Evib / 2625500.2) - molecule.ZPVE
     Etherm = molecule.ZPVE + molecule.thermVib + molecule.thermRot + molecule.thermTrans
-    Etot = molecule.Ee_QM + molecule.ZPVE + molecule.thermVib + molecule.thermRot + molecule.thermTrans
+    Etot = molecule.qm_energy + molecule.ZPVE + molecule.thermVib + molecule.thermRot + molecule.thermTrans
     molecule.kT = (
             k_boltz() / 4.3597482E-18 * temp)  # kT contributon to the enthalpy
     Htot = Etot + molecule.kT  # Enthalpy: H = Etot + kB T in Hartree
@@ -471,11 +412,11 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
         print(
             " Electronic Energy (Ee):"
             "                                 {:> 12.6f} h"
-                .format(molecule.Ee_QM))
+                .format(molecule.qm_energy))
         print(
             " Electronic Energy (Ee + ZPVE):"
             "                          {:> 12.6f} h"
-                .format(molecule.Ee_QM + molecule.ZPVE))
+                .format(molecule.qm_energy + molecule.ZPVE))
         if verbosity >= 2:
             print(
                 "   Translational contribution:"
