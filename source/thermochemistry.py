@@ -16,7 +16,8 @@ from constants import *
 ###############################################################################
 
 def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
-                            scalefreq=1.0, internal="truhlar", verbosity=0):
+                            scalefreq=1.0, internal="truhlar", cutoff=100.0,
+                            verbosity=0):
     # Constants
     # k_boltz() = 1.38064852E-23  # Boltzmann constant in JK⁻¹
     # h_planck() = 6.626070040E-34  # Planck constant in Js
@@ -205,7 +206,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
             # We need to distinguish two cases: (1) linear molecule with 3N-5 vibrations and (2) non-linear
             # molecules with 3N-6 vibrations.
             listOfFreqs = []
-            if inertia_moments[0] - inertia_moments[1] < 0.0005:
+            if inertia_moments[0] - inertia_moments[1] < 0.0005 and inertia_moments[2] < 0.0005:
                 # Case (1): linear molecule
                 if verbosity >= 3:
                     print(
@@ -295,14 +296,39 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
         # if this option is selected and then proceed:
         if internal == "truhlar":
             if verbosity >= 1:
-                print("\n Fixing all low frequencies to 100 cm⁻¹")
+                print("\n Fixing all low frequencies to {:> 6.1f}"
+                      " cm⁻¹".format(cutoff))
             for i in range(0, len(listOfFreqs)):
-                if 0.0 < listOfFreqs[i] < 100.0:
+                if 0.0 < listOfFreqs[i] < cutoff:
                     if verbosity >= 1:
                         print(
-                            " Vibration {} Before: {:> 9.2f} cm⁻¹,"
-                            " After: 100 cm⁻¹".format(i + 1, listOfFreqs[i]))
-                    listOfFreqs[i] = 100.0
+                            " Vibration {} Before: {:> 6.1f} cm⁻¹,"
+                            " After: {:> 6.1f} cm⁻¹".format(i + 1, listOfFreqs[i],cutoff))
+                    listOfFreqs[i] = cutoff
+        # Alternatively, all low-lying modes can be simply ignored completely
+        # Here, we make assumptions about which modes may have an outsize
+        # contribution and completely delete the corresponding frequencies.
+        elif internal == "ignorelow":
+            if verbosity >= 1:
+                print("\n Discarding all low frequencies below {:> 6.1f}"
+                      " cm⁻¹".format(cutoff))
+            # We're going through this list in reverse order, so we can delete
+            # matching items straight away without messing up the list index
+            for i in range(len(listOfFreqs)-1,-1,-1):
+                if 0.0 < listOfFreqs[i] < cutoff:
+                    if verbosity >= 1:
+                        print(
+                            " Vibration {} ({:> 6.1f} cm⁻¹),"
+                            " discarded".format(i + 1, listOfFreqs[i]))
+                        del listOfFreqs[i]
+
+        if verbosity >= 2:
+            print(
+                "\n Frequencies (after scaling and internal rotor treatment):")
+            if verbosity >= 3:
+                print(" (imaginary modes will be ignored)")
+            for i in listOfFreqs:
+                print("{:> 9.2f} cm⁻¹".format(i))
 
         # Then, create a list that contains all vibrational temperatures (makes the summation of the
         # partition function simpler/more convenient)
@@ -329,13 +355,46 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
         Qvib = 1.0
         Svib = 0.0
         Evib = 0.0
+        if verbosity >= 2 and internal == "grimme":
+            print("\n Interpolation between entropic contributions from"
+                  " harmonic oscillators and free rotors for low frequency"
+                  " modes:")
         for j, i in enumerate(listOfVibTemps):
             Qvib = Qvib * (math.exp(-1.0 * i / (2.0 * temp))) / (
                     1 - math.exp(-1.0 * i / (temp)))
-            SvibContribution = ((i / temp) / (
-                    math.exp(i / (temp)) - 1.0)) - math.log(
-                1.0 - math.exp(-1.0 * i / (temp)))
-            Svib += SvibContribution * r_gas()
+            if internal == "grimme":
+                # Frequency of the vibration = freq of free rotor
+                omega = listOfFreqs[j] * c_light()
+                # Moment of the free rotor
+                mu = h_planck()/(8*math.pi*math.pi*omega)
+                # Reduced value for the actual moment to make sure its value
+                # is within reasonable bounds
+                B_av = (inertia_moments[0] + inertia_moments[1] +
+                        inertia_moments[2]) / 3
+                mu_prime = (mu * B_av)/(mu + B_av)
+                # Vibrational entropy as usual
+                vibrational_entropy = ((i / temp) / (
+                        math.exp(i / (temp)) - 1.0)) - math.log(
+                    1.0 - math.exp(-1.0 * i / (temp)))
+                vibrational_entropy = vibrational_entropy * r_gas()
+                # Rotational entropy of the free rotor
+                rotational_entropy = (8 * (
+                            math.pi ** 3) * mu_prime * k_boltz() * temp) / (
+                                                 h_planck() * h_planck())
+                rotational_entropy = math.log(math.sqrt(rotational_entropy))
+                rotational_entropy = (0.5 + rotational_entropy) * r_gas()
+                # Weighting function to balance between vib and rot entropy
+                w = 1/(1+(((cutoff* c_light())/omega)**4))
+                if verbosity >= 3:
+                    print(" Interpolation for vibration {}: {}% Svib, {}% Srot.".format(j,int(w*100),int((1-w)*100)))
+                SvibContribution = (w * vibrational_entropy) + (
+                            (1 - w) * rotational_entropy)
+            else:
+                SvibContribution = ((i / temp) / (
+                        math.exp(i / (temp)) - 1.0)) - math.log(
+                    1.0 - math.exp(-1.0 * i / (temp)))
+                SvibContribution = SvibContribution * r_gas()
+            Svib += SvibContribution
             molecule.VibSList.append(SvibContribution * r_gas())
             EvibContribution = i * (0.5 + (1 / (math.exp(i / temp) - 1.0)))
             Evib += EvibContribution * r_gas()

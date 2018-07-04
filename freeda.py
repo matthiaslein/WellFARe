@@ -6,9 +6,8 @@
 
 import argparse
 import math
-import itertools
-import scipy.misc as misc
-from multiprocessing import Pool, cpu_count
+
+from multiprocessing import cpu_count
 
 from messages import *
 from molecule import Molecule
@@ -341,11 +340,20 @@ parser.add_argument("--scalefreq", type=float,
                     default="1.0")
 parser.add_argument("-i", "--internal",
                     help="method for treating internal rotations. Can either"
-                         " be cet to 'none' for no treatment, or to 'truhlar'"
-                         " to set all vibrational frequencies below 100 cm⁻¹"
-                         " to exactly 100⁻¹. Default is 'truhlar'.",
-                    choices=["none", "truhlar"],
-                    default="truhlar")
+                         " be set to 'none' for no treatment, 'ignorelow'"
+                         " for the removal of all low modes, to 'truhlar'"
+                         " to set all vibrational frequencies below a"
+                         " certain cutoff to the value of the cutoff, or to"
+                         " 'grimme' for an interpolation between the harmonic"
+                         " oscilator and free rotor approximations.",
+                    choices=["none", "ignorelow", "truhlar", "grimme"],
+                    default="grimme")
+parser.add_argument("--cutoff", type=float,
+                    help="cutoff value for the treatment of internal "
+                         " rotations. It's default value depends on the chosen"
+                         " method (see '--internal'). For 'ignorelow' the"
+                         "cutoff is 650 cm⁻¹, for 'truhlar' it is 100 cm⁻¹ and"
+                         "for 'grimme' it is 100 cm⁻¹ as well.")
 parser.add_argument("-a", "--analysis",
                     help="For single compounds, print contributions"
                          " from each vibrational mode.", action='store_true')
@@ -363,6 +371,14 @@ args = parser.parse_args()
 # all available cores.
 if args.numproc == 0:
     args.numproc = cpu_count()
+
+# Treatment of internal rotors sanity checking
+if args.internal == "ignorelow" and args.cutoff is None:
+    args.cutoff = 650.0
+elif args.internal == "truhlar" and args.cutoff is None:
+    args.cutoff = 100.0
+elif args.internal == "grimme" and args.cutoff is None:
+    args.cutoff = 100.0
 
 
 ###############################################################################
@@ -389,7 +405,7 @@ def main():
                                cpu_number=args.numproc)
         thermochemical_analysis(list_of_reactants[-1], temp=args.temperature,
                                 press=args.pressure, scalefreq=args.scalefreq,
-                                internal=args.internal,
+                                internal=args.internal, cutoff=args.cutoff,
                                 verbosity=args.verbosity)
     else:
         for i in args.reactants:
@@ -407,7 +423,7 @@ def main():
                                     temp=args.temperature,
                                     press=args.pressure,
                                     scalefreq=args.scalefreq,
-                                    internal=args.internal,
+                                    internal=args.internal, cutoff=args.cutoff,
                                     verbosity=args.verbosity)
 
     list_of_products = []
@@ -422,7 +438,7 @@ def main():
                                cpu_number=args.numproc)
         thermochemical_analysis(list_of_products[-1], temp=args.temperature,
                                 press=args.pressure, scalefreq=args.scalefreq,
-                                internal=args.internal,
+                                internal=args.internal, cutoff=args.cutoff,
                                 verbosity=args.verbosity)
     elif args.products is not None:
         for i in args.products:
@@ -439,7 +455,7 @@ def main():
             thermochemical_analysis(list_of_products[-1], temp=args.temperature,
                                     press=args.pressure,
                                     scalefreq=args.scalefreq,
-                                    internal=args.internal,
+                                    internal=args.internal, cutoff=args.cutoff,
                                     verbosity=args.verbosity)
     else:
         if args.verbosity >= 1:

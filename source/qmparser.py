@@ -423,7 +423,7 @@ def read_orca_qm_energy(filename, molecule, verbosity=0):
     i = qm_energies[len(qm_energies) - 1]
     read_buffer = i.split()
     qm_energy_on_file = float(read_buffer[4])
-    molecule.qm_energy(qm_energy_on_file)
+    molecule.qm_energy = qm_energy_on_file
     if verbosity >= 2:
         print("\nReading of QM equilibrium energy complete")
         if verbosity >= 3:
@@ -443,7 +443,27 @@ def read_turbomole_qm_energy(filename, molecule, verbosity=0):
     i = qm_energies[len(qm_energies) - 1]
     read_buffer = i.split()
     qm_energy_on_file = float(read_buffer[3])
-    molecule.setQMenergy(qm_energy_on_file)
+    molecule.qm_energy = qm_energy_on_file
+    if verbosity >= 2:
+        print("\nReading of QM equilibrium energy complete")
+        if verbosity >= 3:
+            print("Ee_QM = " + str(qm_energy_on_file))
+    f.close()
+
+
+def read_adf_qm_energy(filename, molecule, verbosity=0):
+    f = open(filename, 'r')
+    qm_energies = []
+    for line in f:
+        if line.find("  Total Bonding Energy:") != -1:
+            if verbosity >= 3:
+                print("\n Total Bonding Energy: found")
+                print(str(line))
+            qm_energies.append(line)
+    i = qm_energies[len(qm_energies) - 1]
+    read_buffer = i.split()
+    qm_energy_on_file = float(read_buffer[3])
+    molecule.qm_energy = qm_energy_on_file
     if verbosity >= 2:
         print("\nReading of QM equilibrium energy complete")
         if verbosity >= 3:
@@ -725,9 +745,9 @@ def read_orca_multiplicity(filename, molecule, verbosity=0):
 def read_turbo_multiplicity(filename, molecule, verbosity=0):
     if verbosity >= 3:
         print(" Reading multiplicity from turbomole file not implemented: assuming singlet.")
-    molecule.set_mult(1)
+        molecule.set_mult(1)
     if verbosity >= 3:
-        print(" Multiplicity = " + str(QMmult))
+        print(" Multiplicity = " + str(1))
 
 
 def read_adf_multiplicity(filename, molecule, verbosity=0):
@@ -785,14 +805,57 @@ def read_gauss_rotational_symmetry_number(filename, molecule, verbosity=0):
 
 def read_orca_rotational_symmetry_number(filename, molecule, verbosity=0):
     QM_sigmaRotnums = []
+    f = open(filename, 'r')
+    for line in f:
+        if line.find("sn is the rotational symmetry number. We have assumed ") != -1:
+            if verbosity >= 3:
+                print("\n Rotational symmetry number found")
+                print(str(line))
+            QM_sigmaRotnums.append(line)
+    # Take the last multiplicity from the file and assign that value as the multiplicity of the molecule
+    if len(QM_sigmaRotnums) != 0:
+        i = QM_sigmaRotnums[len(QM_sigmaRotnums) - 1]
+        read_buffer = i.split()
+        QM_sigmaRotnum = int(float(read_buffer[9]))
+    else:
+        if verbosity >= 3:
+            print(
+                "\n No rotational symmetry number found (this is probably an atom), using default value of 1")
+        QM_sigmaRotnum = 1
+    molecule.sigmaRot = QM_sigmaRotnum
+    if verbosity >= 2:
+        print(" Rotational symmetry number = " + str(QM_sigmaRotnum))
+    f.close()
 
 
 def read_turbo_rotational_symmetry_number(filename, molecule, verbosity=0):
     QM_sigmaRotnums = []
+    #TODO: Find a way to determine from Turbomole output or write own module.
 
 
 def read_adf_rotational_symmetry_number(filename, molecule, verbosity=0):
     QM_sigmaRotnums = []
+    f = open(filename, 'r')
+    for line in f:
+        if line.find(" reported below were computed using sigma = ") != -1:
+            if verbosity >= 3:
+                print("\n Rotational symmetry number found")
+                print(str(line))
+            QM_sigmaRotnums.append(line)
+    # Take the last multiplicity from the file and assign that value as the multiplicity of the molecule
+    if len(QM_sigmaRotnums) != 0:
+        i = QM_sigmaRotnums[len(QM_sigmaRotnums) - 1]
+        read_buffer = i.split()
+        QM_sigmaRotnum = int(float(read_buffer[7].replace(",","")))
+    else:
+        if verbosity >= 3:
+            print(
+                "\n No rotational symmetry number found (this is probably an atom), using default value of 1")
+        QM_sigmaRotnum = 1
+    molecule.sigmaRot = QM_sigmaRotnum
+    if verbosity >= 2:
+        print(" Rotational symmetry number = " + str(QM_sigmaRotnum))
+    f.close()
 
 
 def extract_molecular_data(filename, molecule, verbosity=0,
@@ -879,7 +942,9 @@ def extract_molecular_data(filename, molecule, verbosity=0,
         elif program == "orca":
             read_orca_qm_energy(filename, molecule, verbosity=verbosity)
         elif program == "turbomole":
-            read_turbomole_qm_energy(molecule, [], verbosity=verbosity)
+            read_turbomole_qm_energy(filename, molecule, verbosity=verbosity)
+        elif program == "adf":
+            read_adf_qm_energy(filename, molecule, verbosity=verbosity)
         else:
             # There's no QM energy in xyz files...
             pass
