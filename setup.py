@@ -1,10 +1,10 @@
 from setuptools import setup
 
 setup(
-    name='WellFARe',
+    name='wellfare',
     version='1.0.0',
-    packages=[''],
-    package_dir={'': 'wellfare/source'},
+    packages=['wellfare'],
+    package_dir={'', 'wellfare/source'},
     url='https://github.com/matthiaslein/WellFARe',
     license='GNU General Public License v3.0',
     author='Matthias Lein',
