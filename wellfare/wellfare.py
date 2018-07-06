@@ -4,11 +4,9 @@
 #                   #
 #####################
 
-import time
 import argparse
-from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count
 
-from atom import Atom
 from molecule import Molecule
 from qmparser import extract_molecular_data
 from messages import *

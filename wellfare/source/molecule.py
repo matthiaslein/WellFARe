@@ -4,7 +4,7 @@
 
 import math
 import itertools
-import scipy.misc as misc
+import scipy.special
 import numpy as np
 from typing import Optional
 
@@ -707,7 +707,7 @@ def build_molecular_dihedrals(molecule, verbosity=0, deletefirst=True,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
-        number_of_pairs = int(misc.comb(N=len(molecule.angles), k=2))
+        number_of_pairs = int(scipy.special.comb(N=len(molecule.angles), k=2))
         with EmbarrassingParallelisation(number_of_processes=cpu_number,
                                          number_of_ops=number_of_pairs) as pe:
             res = []
@@ -843,7 +843,7 @@ def build_molecular_angles(molecule, verbosity=0, deletefirst=True,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
-        number_of_pairs = int(misc.comb(N=len(molecule.bonds), k=2))
+        number_of_pairs = int(scipy.special.comb(N=len(molecule.bonds), k=2))
         with EmbarrassingParallelisation(number_of_processes=cpu_number,
                                          number_of_ops=number_of_pairs) as pe:
             res = []
@@ -961,7 +961,7 @@ def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
             print(
                 "\nStarting parallel execution on {} processor"
                 " cores.".format(cpu_number))
-        number_of_pairs = int(misc.comb(N=molecule.num_atoms(), k=2))
+        number_of_pairs = int(scipy.special.comb(N=molecule.num_atoms(), k=2))
         with EmbarrassingParallelisation(number_of_processes=cpu_number,
                                          number_of_ops=number_of_pairs) as pe:
             res = []

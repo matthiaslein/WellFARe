@@ -9,7 +9,7 @@ import math
 import time
 import sys
 import itertools
-import scipy.misc as misc
+import scipy.special
 
 from multiprocessing import cpu_count
 from parallelisation import EmbarrassingParallelisation
@@ -293,7 +293,7 @@ def main():
                 print(
                     "\nStarting parallel execution on {} processor"
                     " cores.".format(args.numproc))
-        number_of_pairs = int(misc.comb(N=molecule1.num_atoms(), k=2))
+        number_of_pairs = int(scipy.special.comb(N=molecule1.num_atoms(), k=2))
         with EmbarrassingParallelisation(number_of_processes=args.numproc,
                                          number_of_ops=number_of_pairs) as pe:
             res = []
