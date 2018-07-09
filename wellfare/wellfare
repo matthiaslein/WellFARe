@@ -1,15 +1,11 @@
-#####################
-#                   #
-# Import statements #
-#                   #
-#####################
+#!/usr/local/bin/python3
 
 import argparse
 from multiprocessing import cpu_count
 
-from molecule import Molecule
-from qmparser import extract_molecular_data
-from messages import *
+from wellfare.molecule import Molecule
+from wellfare.qmparser import extract_molecular_data
+from wellfare.messages import *
 
 ########################################################
 #                                                      #

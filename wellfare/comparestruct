@@ -1,3 +1,4 @@
+#!/usr/local/bin/python3
 ##############################################################################
 #                                                                            #
 # This is the part of the program where modules are imported                 #
@@ -12,12 +13,12 @@ import itertools
 import scipy.special
 
 from multiprocessing import cpu_count
-from parallelisation import EmbarrassingParallelisation
-from messages import msg_program_header, msg_program_footer, msg_timestamp
+from wellfare.parallelisation import EmbarrassingParallelisation
+from wellfare.messages import msg_program_header, msg_program_footer, msg_timestamp
 
-from molecule import Molecule, build_molecular_dihedrals, \
+from wellfare.molecule import Molecule, build_molecular_dihedrals, \
     build_molecular_angles, build_bond_orders
-from qmparser import extract_molecular_data
+from wellfare.qmparser import extract_molecular_data
 
 
 def check_dist_list(molecule_a, molecule_b, chunk_start, chunk_end, toler):

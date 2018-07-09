@@ -8,10 +8,10 @@ import scipy.special
 import numpy as np
 from typing import Optional
 
-from atom import Atom
-from constants import symbol_to_mass, symbol_to_covalent_radius
-from messages import msg_program_error
-from parallelisation import EmbarrassingParallelisation
+from wellfare.atom import Atom
+from wellfare.constants import symbol_to_mass, symbol_to_covalent_radius
+from wellfare.messages import msg_program_error
+from wellfare.parallelisation import EmbarrassingParallelisation
 
 
 class Molecule:

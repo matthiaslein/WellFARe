@@ -1,3 +1,4 @@
+#!/usr/local/bin/python3
 ###############################################################################
 #                                                                             #
 # This is where the MICEPES program is put together                           #
@@ -10,11 +11,11 @@ import os
 import copy
 import numpy as np
 
-from messages import *
-from atom import Atom
-from molecule import Molecule
-from qmparser import extract_molecular_data
-from constants import symbol_to_covalent_radius
+from wellfare.messages import *
+from wellfare.atom import Atom
+from wellfare.molecule import Molecule
+from wellfare.qmparser import extract_molecular_data
+from wellfare.constants import symbol_to_covalent_radius
 
 
 def build_rotation_matrix(axis, angle):

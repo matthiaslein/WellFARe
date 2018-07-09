@@ -1,3 +1,4 @@
+#!/usr/local/bin/python3
 #############################################################################
 #                                                                            #
 # This is the part of the program where modules are imported                 #
@@ -9,10 +10,10 @@ import math
 
 from multiprocessing import cpu_count
 
-from messages import *
-from molecule import Molecule
-from qmparser import extract_molecular_data
-from thermochemistry import thermochemical_analysis
+from wellfare.messages import *
+from wellfare.molecule import Molecule
+from wellfare.qmparser import extract_molecular_data
+from wellfare.thermochemistry import thermochemical_analysis
 
 
 

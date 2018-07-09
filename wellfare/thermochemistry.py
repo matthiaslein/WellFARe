@@ -5,9 +5,9 @@ import numpy as np
 # from typing import Optional
 #
 # from molecule import Molecule
-from conversions import *
-from constants import *
-from messages import *
+from wellfare.conversions import *
+from wellfare.constants import *
+from wellfare.messages import *
 
 
 ###############################################################################

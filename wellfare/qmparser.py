@@ -9,11 +9,11 @@ import numpy as np
 
 from typing import Any
 
-from constants import *
-from conversions import *
-from messages import *
-from atom import Atom
-from molecule import Molecule, build_molecular_dihedrals, \
+from wellfare.constants import *
+from wellfare.conversions import *
+from wellfare.messages import *
+from wellfare.atom import Atom
+from wellfare.molecule import Molecule, build_molecular_dihedrals, \
     build_molecular_angles, build_bond_orders
 
 

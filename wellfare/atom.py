@@ -4,7 +4,7 @@
 
 from typing import Optional
 
-from constants import *
+from wellfare.constants import *
 
 
 class Atom:

@@ -2,7 +2,7 @@
 # Methods for unit conversions are defined below
 ###############################################################################
 
-from constants import symbol_to_number
+from wellfare.constants import symbol_to_number
 
 
 # Conversion of length in Angstroms to
