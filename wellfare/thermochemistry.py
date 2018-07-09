@@ -186,6 +186,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
     if molecule.num_atoms() != 1 and (
             molecule.H_QM != [] or molecule.frequencies != []):
         # If we didn't read frequencies from file, calculate them from force constants
+        listOfFreqs = []
         if molecule.frequencies == []:
             if verbosity >= 2:
                 print("\n Vibrational analysis:")
@@ -206,7 +207,6 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
 
             # We need to distinguish two cases: (1) linear molecule with 3N-5 vibrations and (2) non-linear
             # molecules with 3N-6 vibrations.
-            listOfFreqs = []
             if inertia_moments[0] - inertia_moments[1] < 0.0005 and inertia_moments[2] < 0.0005:
                 # Case (1): linear molecule
                 if verbosity >= 3:
@@ -276,7 +276,12 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                     print("{:> 9.2f} cm⁻¹".format(i))
         else:
             # If we've read the frequencies from file, just use those
-            listOfFreqs = molecule.frequencies
+            for i in molecule.frequencies:
+                if i < 0.0:
+                    # We don't add imaginary modes to the thermochemistry
+                    pass
+                else:
+                    listOfFreqs.append(i)
 
         # Check if we have been asked to scale all frequencies
         if scalefreq != 1.0:

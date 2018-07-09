@@ -2,9 +2,9 @@ from setuptools import setup
 
 setup(
     name='wellfare',
-    version='1.0.1',
-    python_requires='>=3.5',
-    install_requires=['scipy', 'numpy', 'matplotlib'],
+    version='1.0.3',
+    python_requires='>=3.4',
+    install_requires=['scipy', 'numpy', 'matplotlib', 'typing'],
     packages=['wellfare'],
     scripts={'wellfare/comparestruct', 'wellfare/freeda', 'wellfare/mincepies',
              'wellfare/specplot', 'wellfare/wellfare'},

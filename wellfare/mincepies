@@ -166,7 +166,7 @@ def replace_h_with_tetrahedral(molecule, h, replacement="C", add_h=3,
         rot_matrix = build_rotation_matrix(cross, 109.4712206)
 
         vector = np.matrix([xcompo, ycompo, zcompo])
-        vector = rot_matrix @ np.matrix.transpose(vector)
+        vector = np.dot(rot_matrix,np.matrix.transpose(vector))
         vector = np.array(vector).flatten().tolist()
 
         xcompo = vector[0]
@@ -188,7 +188,7 @@ def replace_h_with_tetrahedral(molecule, h, replacement="C", add_h=3,
 
         # Rotate a second time
         vector = np.matrix([xcompo, ycompo, zcompo])
-        vector = rot_matrix @ np.matrix.transpose(vector)
+        vector = np.dot(rot_matrix, np.matrix.transpose(vector))
         vector = np.array(vector).flatten().tolist()
         xcompo = vector[0]
         ycompo = vector[1]
@@ -201,7 +201,7 @@ def replace_h_with_tetrahedral(molecule, h, replacement="C", add_h=3,
         # And then, we do this a third and last time... (re-using the rotation
         # matrix because we're rotating about 120 degrees again).
         vector = np.matrix([xcompo, ycompo, zcompo])
-        vector = rot_matrix @ np.matrix.transpose(vector)
+        vector = np.dot(rot_matrix, np.matrix.transpose(vector))
         vector = np.array(vector).flatten().tolist()
         xcompo = vector[0]
         ycompo = vector[1]
@@ -360,7 +360,7 @@ def replace_h_with_ethenyl(molecule, h, ignore_warning=False):
     rot_matrix = build_rotation_matrix(cross, 120.0)
 
     vector = np.matrix([xcompo, ycompo, zcompo])
-    vector = rot_matrix @ np.matrix.transpose(vector)
+    vector = np.dot(rot_matrix, np.matrix.transpose(vector))
     vector = np.array(vector).flatten().tolist()
     xcompo = vector[0]
     ycompo = vector[1]
@@ -391,7 +391,7 @@ def replace_h_with_ethenyl(molecule, h, ignore_warning=False):
     rot_matrix = build_rotation_matrix(cross, 240.0)
 
     vector = np.matrix([xcompo, ycompo, zcompo])
-    vector = rot_matrix @ np.matrix.transpose(vector)
+    vector = np.dot(rot_matrix, np.matrix.transpose(vector))
     vector = np.array(vector).flatten().tolist()
 
     xcompo = vector[0]
@@ -534,7 +534,7 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
     rot_matrix = build_rotation_matrix(cross, 120.0)
 
     vector = np.matrix([xcompo, ycompo, zcompo])
-    vector = rot_matrix @ np.matrix.transpose(vector)
+    vector = np.dot(rot_matrix, np.matrix.transpose(vector))
     vector = np.array(vector).flatten().tolist()
     xcompo = vector[0]
     ycompo = vector[1]
@@ -572,7 +572,7 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
     rot_matrix = build_rotation_matrix(cross, 240.0)
 
     vector = np.matrix([xcompo, ycompo, zcompo])
-    vector = rot_matrix @ np.matrix.transpose(vector)
+    vector = np.dot(rot_matrix, np.matrix.transpose(vector))
     vector = np.array(vector).flatten().tolist()
     xcompo = vector[0]
     ycompo = vector[1]
@@ -595,14 +595,14 @@ def replace_h_with_cho(molecule, h, orientation=0, ignore_warning=False):
             rot_matrix = build_rotation_matrix(cross, 240.0)
 
         vector = np.matrix([x_new_o, y_new_o, z_new_o])
-        vector = rot_matrix @ np.matrix.transpose(vector)
+        vector = np.dot(rot_matrix, np.matrix.transpose(vector))
         vector = np.array(vector).flatten().tolist()
         x_new_o = vector[0]
         y_new_o = vector[1]
         z_new_o = vector[2]
 
         vector = np.matrix([x_new_h, y_new_h, z_new_h])
-        vector = rot_matrix @ np.matrix.transpose(vector)
+        vector = np.dot(rot_matrix, np.matrix.transpose(vector))
         vector = np.array(vector).flatten().tolist()
         x_new_h = vector[0]
         y_new_h = vector[1]
@@ -936,4 +936,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except:
+        msg_program_error("This didn't go according to plan: Tell Matthias!")

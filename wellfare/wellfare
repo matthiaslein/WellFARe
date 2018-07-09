@@ -53,4 +53,7 @@ def main():
         msg_program_footer(prg_start_time)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except:
+        msg_program_error("This didn't go according to plan: Tell Matthias!")
