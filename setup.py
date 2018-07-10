@@ -2,12 +2,12 @@ from setuptools import setup
 
 setup(
     name='wellfare',
-    version='1.0.3',
+    version='1.0.4',
     python_requires='>=3.4',
     install_requires=['scipy', 'numpy', 'matplotlib', 'typing'],
     packages=['wellfare'],
-    scripts={'wellfare/comparestruct', 'wellfare/freeda', 'wellfare/mincepies',
-             'wellfare/specplot', 'wellfare/wellfare'},
+    scripts={'scripts/comparestruct', 'scripts/freeda', 'scripts/mincepies',
+             'scripts/specplot', 'scripts/wellfare'},
     url='https://github.com/matthiaslein/WellFARe',
     license='GNU General Public License v3.0',
     author='Matthias Lein',

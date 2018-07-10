@@ -6,6 +6,7 @@
 ###############################################################################
 
 import numpy as np
+import math
 
 from typing import Any
 
@@ -82,11 +83,11 @@ def read_gauss_bond_orders(filename, molecule, verbosity=0):
                         j = j + 1
                         bo[int(row[0]) - 1][int(i) - 1] = float(row[j])
     f.close()
-    # if verbosity >= 3:
-    #     print("\nBond Orders:")
-    #     np.set_printoptions(suppress=True)
-    #     np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
-    #     print(bo)
+    if verbosity >= 3:
+        print("\nBond Orders:")
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        print(bo)
     build_bond_orders(molecule, bo, verbosity=verbosity)
 
 
@@ -116,11 +117,11 @@ def read_orca_bond_orders(filename, molecule, verbosity=0):
                 else:
                     break
     f.close()
-    # if verbosity >= 3:
-    #     print("\nBond Orders:")
-    #     np.set_printoptions(suppress=True)
-    #     np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
-    #     print(bo)
+    if verbosity >= 3:
+        print("\nBond Orders:")
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        print(bo)
     build_bond_orders(molecule, bo, verbosity=verbosity)
 
 
@@ -379,26 +380,26 @@ def read_gauss_qm_energy(filename, molecule, verbosity=0):
     qm_energies = []
     for line in f:
         if line.find("SCF Done:") != -1:
-            readBuffer = line.split()
-            readBuffer = float(readBuffer[4])
-            qm_energies.append(readBuffer)
+            read_buffer = line.split()
+            read_buffer = float(read_buffer[4])
+            qm_energies.append(read_buffer)
             if verbosity >= 3:
                 print("\nEnergy from SCF cycle found")
-                print("SCF:", str(readBuffer))
+                print("SCF:", str(read_buffer))
         elif line.find(" EUMP2 = ") != -1:
-            readBuffer = line.split()
-            readBuffer = float(readBuffer[5].replace('D', 'E'))
-            qm_energies.append(readBuffer)
+            read_buffer = line.split()
+            read_buffer = float(read_buffer[5].replace('D', 'E'))
+            qm_energies.append(read_buffer)
             if verbosity >= 3:
                 print("\nEnergy from MP2 calculation found")
-                print("MP2:", str(readBuffer))
+                print("MP2:", str(read_buffer))
         elif line.find(" CCSD(T)= ") != -1:
-            readBuffer = line.split()
-            readBuffer = float(readBuffer[1].replace('D', 'E'))
-            qm_energies.append(readBuffer)
+            read_buffer = line.split()
+            read_buffer = float(read_buffer[1].replace('D', 'E'))
+            qm_energies.append(read_buffer)
             if verbosity >= 3:
                 print("\nEnergy from CCSD(T) calculation found")
-                print("CCSD(T):", str(readBuffer))
+                print("CCSD(T):", str(read_buffer))
 
     # Take the last QM energy from the list and assign that value as the
     # QM equilibrium energy of the molecule
@@ -481,19 +482,19 @@ def read_gauss_force_constants(filename, molecule, verbosity=0):
                     "\nForce constants in Cartesian coordinates, reading data")
             H = np.zeros((3 * molecule.num_atoms(), 3 * molecule.num_atoms()))
             while True:
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
                 # Check if the whole line is integers only (Header line)
-                if is_int("".join(readBuffer.split())) == True:
+                if is_int("".join(read_buffer.split())) == True:
                     # And use this information to label the columns
-                    columns = readBuffer.split()
+                    columns = read_buffer.split()
                 # Once we find one of these statements, we're done reading
-                elif readBuffer.find(
-                        "FormGI is forming") != -1 or readBuffer.find(
-                        "Cartesian forces in FCRed") != -1 or readBuffer.find(
+                elif read_buffer.find(
+                        "FormGI is forming") != -1 or read_buffer.find(
+                        "Cartesian forces in FCRed") != -1 or read_buffer.find(
                     "Final forces over variables") != -1:
                     break
                 else:
-                    row = readBuffer.split()
+                    row = read_buffer.split()
                     for i in range(0, len(row) - 1):
                         H[int(row[0]) - 1][int(columns[i]) - 1] = row[
                             i + 1].replace('D', 'E')
@@ -504,8 +505,8 @@ def read_gauss_force_constants(filename, molecule, verbosity=0):
     if verbosity >= 3:
         print(
             "\nForce constants in Cartesian coordinates (Input orientation):")
-        # np.set_printoptions(suppress=True)
-        # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
         print(H)
     f.close()
 
@@ -516,8 +517,8 @@ def read_orca_force_constants(filename, molecule, verbosity=0):
     if verbosity >= 3:
         print(
             "\nForce constants in Cartesian coordinates:")
-        # np.set_printoptions(suppress=True)
-        # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
         print(H)
 
 
@@ -531,38 +532,38 @@ def read_turbo_force_constants(filename, molecule, verbosity=0):
                     "\nForce constants in Cartesian coordinates, reading data")
             H = np.zeros((3 * molecule.num_atoms(), 3 * molecule.num_atoms()))
             for i in range(0, 2):
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
             while True:
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
                 # Check if the line is labeled: "ATOM" (Header line)
-                if readBuffer.find("ATOM") != -1:
+                if read_buffer.find("ATOM") != -1:
                     # And use this information to label the columns
                     columns = []
-                    columns.append(int(readBuffer.split()[1]))
-                    if len(readBuffer.split()) > 3:
-                        columns.append(int(readBuffer.split()[3]))
+                    columns.append(int(read_buffer.split()[1]))
+                    if len(read_buffer.split()) > 3:
+                        columns.append(int(read_buffer.split()[3]))
                 # Look for the lines below the header lines
-                elif readBuffer.find(
-                        "dx        dy        dz") != -1 or readBuffer.isspace() == True:
+                elif read_buffer.find(
+                        "dx        dy        dz") != -1 or read_buffer.isspace() == True:
                     # And then we do nothing with this line
                     pass
                 # Look for lines that begin with an atom number
-                elif len(readBuffer.split()) > 0 and is_int(readBuffer.split()[0]) == True:
+                elif len(read_buffer.split()) > 0 and is_int(read_buffer.split()[0]) == True:
                     # And then we use that bit to set the row number
-                    row = int(readBuffer.split()[0])
+                    row = int(read_buffer.split()[0])
                     rowAdd = 0
-                    readRawData = readBuffer.replace("-", " -")
+                    readRawData = read_buffer.replace("-", " -")
                     readData = readRawData.split()[3:]
                     for j, i in enumerate(readData):
                         H[(row - 1) * 3][((columns[0] - 1) * 3) + j] = i
                         H[((columns[0] - 1) * 3) + j][(row - 1) * 3] = i
                 # Once we find one of these statements, we're done reading
-                elif readBuffer.find(
+                elif read_buffer.find(
                         "*** projected hessian written onto") != -1:
                     break
                 else:
                     rowAdd += 1
-                    readRawData = readBuffer.replace("-", " -")
+                    readRawData = read_buffer.replace("-", " -")
                     readData = readRawData.split()[1:]
                     for j, i in enumerate(readData):
                         H[((row - 1) * 3) + rowAdd][
@@ -574,8 +575,8 @@ def read_turbo_force_constants(filename, molecule, verbosity=0):
     if verbosity >= 3:
         print(
             "\nForce constants in Cartesian coordinates (translational & rotational space projected out):")
-        # np.set_printoptions(suppress=True)
-        # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
         print(H)
     f.close()
 
@@ -590,21 +591,26 @@ def read_adf_force_constants(filename, molecule, verbosity=0):
                     "\nForce constants in Cartesian coordinates, reading data")
             # skip 3 lines ahead, that's where the data starts
             for i in range(0, 3):
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
             while True:
-                readBuffer = f.__next__()
-                if readBuffer.find("=====") != -1:
+                read_buffer = f.__next__()
+                if read_buffer.find("=====") != -1:
                     break
                 else:
-                    h_line=[float(i) for i in readBuffer.split()[3:]]
-                    H.append(h_line)
+                    if read_buffer.find(":") != -1:
+                        h_line=[float(i) for i in read_buffer.split()[3:]]
+                        H += h_line
+                    else:
+                        h_line=[float(i) for i in read_buffer.split()]
+                        H += h_line
+            H = np.reshape(H,(3 * molecule.num_atoms(),3 * molecule.num_atoms()))
     # Store H as the QM calculated Hessian for this molecule
     molecule.set_hessian(H)
     if verbosity >= 3:
         print(
-            "\nForce constants in Cartesian coordinates (Input orientation):")
-        # np.set_printoptions(suppress=True)
-        # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+            "\nForce constants in Cartesian coordinates:")
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
         print(H)
     f.close()
 
@@ -620,8 +626,8 @@ def read_gauss_frequencies(filename, molecule, verbosity=0):
         if line.find(" Frequencies -- ") != -1:
             if verbosity >= 2:
                 print("\nReading frequencies from file.")
-            readBuffer = line.split()
-            for i in readBuffer[2:]:
+            read_buffer = line.split()
+            for i in read_buffer[2:]:
                 freq.append(float(i))
     if verbosity >= 3:
         print("\nFrequencies:")
@@ -638,13 +644,13 @@ def read_orca_frequencies(filename, molecule, verbosity=0):
             if verbosity >= 2:
                 print("\nReading frequencies from file.")
             while True:
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
                 # Check if the whole line is integers only (Header line)
-                if readBuffer.find("cm**-1") != -1:
-                    if math.fabs(float(readBuffer.split()[1])) > 1.0:
-                        freq.append(float(readBuffer.split()[1]))
+                if read_buffer.find("cm**-1") != -1:
+                    if math.fabs(float(read_buffer.split()[1])) > 1.0:
+                        freq.append(float(read_buffer.split()[1]))
                 # Once we find this statement, we're done reading
-                elif readBuffer.find("NORMAL MODES") != -1:
+                elif read_buffer.find("NORMAL MODES") != -1:
                     break
     if verbosity >= 3:
         print("\nFrequencies:")
@@ -661,13 +667,13 @@ def read_turbo_frequencies(filename, molecule, verbosity=0):
             if verbosity >= 2:
                 print("\nReading frequencies from file.")
             while True:
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
                 # Check if the whole line is integers only (Header line)
-                if readBuffer.find("cm**-1") != -1:
-                    if math.fabs(float(readBuffer.split()[1])) > 1.0:
-                        freq.append(float(readBuffer.split()[1]))
+                if read_buffer.find("cm**-1") != -1:
+                    if math.fabs(float(read_buffer.split()[1])) > 1.0:
+                        freq.append(float(read_buffer.split()[1]))
                 # Once we find this statement, we're done reading
-                elif readBuffer.find("NORMAL MODES") != -1:
+                elif read_buffer.find("NORMAL MODES") != -1:
                     break
     if verbosity >= 3:
         print("\nFrequencies:")
@@ -685,14 +691,14 @@ def read_adf_frequencies(filename, molecule, verbosity=0):
                 print("\nReading frequencies from file.")
             # skip 8 lines ahead, that's where the data starts
             for i in range(0,8):
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
             while True:
-                readBuffer = f.__next__()
+                read_buffer = f.__next__()
                 # Check if the whole line is integers only (Header line)
-                if readBuffer.isspace():
+                if read_buffer.isspace():
                     break
                 else:
-                    freq.append(float(readBuffer.split()[0]))
+                    freq.append(float(read_buffer.split()[0]))
     if verbosity >= 3:
         print("\nFrequencies:")
         print(freq)
@@ -711,8 +717,8 @@ def read_gauss_multiplicity(filename, molecule, verbosity=0):
             QM_multiplicities.append(line)
     # Take the last multiplicity from the file and assign that value as the multiplicity of the molecule
     i = QM_multiplicities[len(QM_multiplicities) - 1]
-    readBuffer = i.split()
-    QMmult = int(readBuffer[5])
+    read_buffer = i.split()
+    QMmult = int(read_buffer[5])
     molecule.set_mult(QMmult)
     if verbosity >= 2:
         print("\nReading of multiplicities complete")
@@ -732,8 +738,8 @@ def read_orca_multiplicity(filename, molecule, verbosity=0):
             QM_multiplicities.append(line)
     # Take the last multiplicity from the file and assign that value as the multiplicity of the molecule
     i = QM_multiplicities[len(QM_multiplicities) - 1]
-    readBuffer = i.split()
-    QMmult = int(readBuffer[3])
+    read_buffer = i.split()
+    QMmult = int(read_buffer[3])
     molecule.set_mult(QMmult)
     if verbosity >= 2:
         print("\nReading of multiplicities complete")
@@ -765,9 +771,9 @@ def read_adf_multiplicity(filename, molecule, verbosity=0):
     # the multiplicity of the molecule. If none was found: singlet
     if len(QM_multiplicities) > 0:
         i = QM_multiplicities[len(QM_multiplicities) - 1]
-        readBuffer = i.split()
+        read_buffer = i.split()
         # Need to add "1" here to get from spin polarisation to multiplicity
-        QMmult = int(float(readBuffer[4])) + 1
+        QMmult = int(float(read_buffer[4])) + 1
     else:
         QMmult = 1
         if verbosity >= 3:
@@ -790,8 +796,8 @@ def read_gauss_rotational_symmetry_number(filename, molecule, verbosity=0):
     # Take the last multiplicity from the file and assign that value as the multiplicity of the molecule
     if len(QM_sigmaRotnums) != 0:
         i = QM_sigmaRotnums[len(QM_sigmaRotnums) - 1]
-        readBuffer = i.split()
-        QM_sigmaRotnum = int(float(readBuffer[3]))
+        read_buffer = i.split()
+        QM_sigmaRotnum = int(float(read_buffer[3]))
     else:
         if verbosity >= 3:
             print(

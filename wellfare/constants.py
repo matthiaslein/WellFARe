@@ -128,7 +128,7 @@ symbol_to_covalent_radius = {
     "Mt": 1.50, "Ds": 1.50, "Rg": 1.50, "Cn": 1.50, "Nh": 1.50, "Fl": 1.50,
     "Mc": 1.50, "Lv": 1.50, "Uus": 1.50, "Ts": 1.50}
 
-# Define dictionary to convert atomic symbols to van der Waals radii (in Angstrom)
+# Define dictionary to convert atomic symbols to van der Waals radii (in Å)
 symbol_to_vdv_radius = {
     "H": 1.10, "He": 1.40, "Li": 1.82, "Be": 1.53, "B": 1.92, "C": 1.70,
     "N": 1.55, "O": 1.52, "F": 1.47, "Ne": 1.54, "Na": 2.27, "Mg": 1.73,
@@ -191,3 +191,11 @@ def r_gas():
 
 def c_light():
     return 2.9979258E10  # Speed of light in cm s⁻¹
+
+
+def avogadro_num():
+    return 6.0221409E23  # Avogadro's number
+
+
+def hartree_to_j_per_mol():
+    return 2625500.2  # Conversion factor from hartree to J mol⁻¹

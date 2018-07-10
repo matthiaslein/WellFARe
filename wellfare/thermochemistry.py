@@ -44,12 +44,12 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
 
     # Translational Partition Function
     Qtrans = (((2 * math.pi * (
-            molecule.mass() / 6.0221409E26) * k_boltz() * temp) / (
+            molecule.mass() / (avogadro_num()*1000)) * k_boltz() * temp) / (
                        h_planck() ** 2)) ** (3 / 2)) * (
                      (k_boltz() * temp) / press)
     molecule.transS = r_gas() * (math.log(Qtrans) + 1 + (3 / 2))
     Etrans = (3 / 2) * r_gas() * temp
-    molecule.thermTrans = Etrans / 2625500.2
+    molecule.thermTrans = Etrans / hartree_to_j_per_mol()
     if verbosity >= 2:
         print(
             "\n Translational partition function:               {:> 12.5E}".format(
@@ -349,13 +349,13 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
             # instead of calculating them ourselves.
             if i > 0.0:
                 molecule.ZPVEList.append(
-                    (h_planck() * nu * 6.0221409E23) / 2.0 / 2625500.2)
-                ZPVE += h_planck() * nu * 6.0221409E23
+                    (h_planck() * nu * avogadro_num()) / 2.0 / hartree_to_j_per_mol())
+                ZPVE += h_planck() * nu * avogadro_num()
                 listOfVibTemps.append(phi)
             if verbosity >= 2:
                 print("{:> 9.2f} K".format(phi))
         molecule.ZPVE = (
-                                ZPVE / 2.0) / 2625500.2  # Converted from Joules to Hartree straight away
+                                ZPVE / 2.0) / hartree_to_j_per_mol()  # Converted from Joules to Hartree straight away
         # Now, assemble the partition function, vibrational entropy and the vibrational contribution to
         # the total thermal energy along with the zero point vibrational energy
         Qvib = 1.0
@@ -406,7 +406,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
             Evib += EvibContribution * r_gas()
             molecule.thermVibList.append(
                 math.fabs((EvibContribution * r_gas()) - (
-                        molecule.ZPVEList[j] * 2625500.2)) / 2625500.2)
+                        molecule.ZPVEList[j] * hartree_to_j_per_mol())) / hartree_to_j_per_mol())
 
     else:
         # If there are no vibrations, i.e. for a single atom, the results are straightforward:
@@ -420,8 +420,8 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
         Evib = 0.0
 
     molecule.vibS = Svib
-    molecule.thermRot = (e_rot / 2625500.2)
-    molecule.thermVib = (Evib / 2625500.2) - molecule.ZPVE
+    molecule.thermRot = (e_rot / hartree_to_j_per_mol())
+    molecule.thermVib = (Evib / hartree_to_j_per_mol()) - molecule.ZPVE
     Etherm = molecule.ZPVE + molecule.thermVib + molecule.thermRot + molecule.thermTrans
     Etot = molecule.qm_energy + molecule.ZPVE + molecule.thermVib + molecule.thermRot + molecule.thermTrans
     molecule.kT = (
@@ -430,7 +430,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
     Stot = (
             molecule.elecS + molecule.transS + molecule.rotS + molecule.vibS)  # Total entropy
     molecule.negTS = (
-            -1.0 * temp * Stot / 2625500.2)  # Total entropic contribution TS
+            -1.0 * temp * Stot / hartree_to_j_per_mol())  # Total entropic contribution TS
     Gtot = Htot + molecule.negTS
     if molecule.frequencies == [] and molecule.H_QM == []:
         msg_program_warning(
@@ -451,21 +451,21 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
             print(
                 "  Vibration {:4}:"
                 "                        {:> 12.2f} J mol⁻¹"
-                    .format(i + 1, j * 2625500.2))
+                    .format(i + 1, j * hartree_to_j_per_mol()))
         print(
             " Total zero-point vibrational energy (ZPVE):"
             "            {:> 12.2f} J mol⁻¹\n"
-                .format(molecule.ZPVE * 2625500.2))
+                .format(molecule.ZPVE * hartree_to_j_per_mol()))
         print("  Contributions to the vibrations:")
         for i, j in enumerate(molecule.thermVibList):
             print(
                 "  Vibration {:4}:"
                 "                        {:> 12.2f} J mol⁻¹"
-                    .format(i + 1, j * 2625500.2))
+                    .format(i + 1, j * hartree_to_j_per_mol()))
         print(
             " Total vibrational contribution to the energy:"
             "    {:> 12.2f} J mol⁻¹"
-                .format(molecule.thermVib * 2625500.2))
+                .format(molecule.thermVib * hartree_to_j_per_mol()))
 
     if verbosity >= 1:
         print("\n Summary of the thermochemistry for: ", molecule.name)

@@ -56,4 +56,23 @@ if __name__ == '__main__':
     try:
         main()
     except:
-        msg_program_error("This didn't go according to plan: Tell Matthias!")
+        error_txt = "This didn't go according to plan: Tell Matthias!"
+        error_txt += "\n\n(Please email the command line arguments you"
+        error_txt += " used\ntogether with the files you were analyzing"
+        error_txt += " and the\ninformation below (within the"
+        error_txt += " exclamation marks)\nto: matthias.lein@gmail.com.\n\n"
+        error_txt += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+
+        # Get info about the exception
+        exceptiondata = traceback.format_exc().splitlines()
+        # Extract from this data: Exception type first, then traceback
+        exception_type = exceptiondata[-1]
+        exception_line = exceptiondata[-3].split()[3]
+        exception_module = exceptiondata[-3].split()[5]
+        # Print exception type
+        error_txt += "! {}\n".format(exception_type)
+        # Print line number and module
+        error_txt += "! Line {} in module {}\n".format(exception_line,
+                                                     exception_module)
+        error_txt += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+        msg_program_error(error_txt)
