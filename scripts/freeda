@@ -472,6 +472,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except KeyboardInterrupt:
+        msg_program_error("Keyboard interrupt by user")
     except:
         error_txt = "This didn't go according to plan: Tell Matthias!"
         error_txt += "\n\n(Please email the command line arguments you"

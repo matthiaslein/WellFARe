@@ -1,7 +1,7 @@
 ###############################################################################
 # Dictionaries with constants from the periodic table are defined here
 ###############################################################################
-
+import math
 
 # Dictionary to convert atomic symbols to atomic numbers
 symbol_to_number = {
@@ -199,3 +199,8 @@ def avogadro_num():
 
 def hartree_to_j_per_mol():
     return 2625500.2  # Conversion factor from hartree to J mol⁻¹
+
+
+def au_to_wavenumbers():
+    return 219474.63  # Conversion from raw frequencies to cm⁻¹
+

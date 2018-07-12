@@ -1,5 +1,5 @@
 import math
-
+import itertools
 import numpy as np
 
 # from typing import Optional
@@ -16,14 +16,72 @@ from wellfare.messages import *
 #                                                                             #
 ###############################################################################
 
+def translation_rotation_projector(molecule, verbosity=0):
+    # This is the list of vectors that will hold the translations and rotations
+    vectors = []
+    # Add those six vectors to this list
+    for i in range(0, 6):
+        vectors.append(np.zeros(3 * molecule.num_atoms()))
+    # Now we iterate of the list of atoms to fill the three vectors that
+    # represent translations with (mass weighted) values.
+    for i,j in enumerate(molecule.atoms):
+        # Technically, Im using the wrong mass for mass-weighting here, but
+        # I'm lazy and since these vectors will be normalised any value that
+        # is proportional to the correct mass (I'm using a.u. masses) is OK :)
+        vectors[0][3 * i] = math.sqrt(j.mass)
+        vectors[1][(3 * i)+1] = math.sqrt(j.mass)
+        vectors[2][(3 * i)+2] = math.sqrt(j.mass)
+    # Now, we fill the remaining three vectors with the rotational basis
+    axes = []
+    axes.append([1, 0, 0])
+    axes.append([0, 1, 0])
+    axes.append([0, 0, 1])
+    for i, j in enumerate(molecule.atoms):
+        cross_product_x = np.cross(axes[0], [ang_to_bohr(j.xpos()),
+                                                     ang_to_bohr(j.ypos()),
+                                                     ang_to_bohr(j.zpos())])
+        cross_product_y = np.cross(axes[1], [ang_to_bohr(j.xpos()),
+                                                     ang_to_bohr(j.ypos()),
+                                                     ang_to_bohr(j.zpos())])
+        cross_product_z = np.cross(axes[2], [ang_to_bohr(j.xpos()),
+                                                     ang_to_bohr(j.ypos()),
+                                                     ang_to_bohr(j.zpos())])
+        vectors[3][(3 * i)] = (cross_product_x[0]) / math.sqrt(j.mass)
+        vectors[3][(3 * i) + 1] = (cross_product_x[1]) * math.sqrt(j.mass)
+        vectors[3][(3 * i) + 2] = (cross_product_x[2]) * math.sqrt(j.mass)
+        vectors[4][(3 * i)] = (cross_product_y[0]) * math.sqrt(j.mass)
+        vectors[4][(3 * i) + 1] = (cross_product_y[1]) * math.sqrt(j.mass)
+        vectors[4][(3 * i) + 2] = (cross_product_y[2]) * math.sqrt(j.mass)
+        vectors[5][(3 * i)] = (cross_product_z[0]) * math.sqrt(j.mass)
+        vectors[5][(3 * i) + 1] = (cross_product_z[1]) * math.sqrt(j.mass)
+        vectors[5][(3 * i) + 2] = (cross_product_z[2]) * math.sqrt(j.mass)
+
+    # Normalise the vectors (and throw inappropriate ones out)
+    norm_vectors = []
+    for vector in vectors:
+        if np.linalg.norm(vector) < 0.0001:
+            pass  # The norm of one of these will be small for linear molecules
+        else:
+            norm_vectors.append((1.0/np.linalg.norm(vector)) * vector)
+    if verbosity >= 3:
+        print("We have {} projection vectors.".format(len(norm_vectors)))
+        for vector in norm_vectors:
+            print("Vector: {} Norm: {}".format(vector,np.linalg.norm(vector)))
+
+    # Create identity matrix to hold the starting point for the projector
+    projector = np.identity(3 * molecule.num_atoms())
+    # This matrix holds the sum of the outer products in the resolution of the
+    # identity of the translational/rotational basis
+    sum_of_vectors = np.zeros((3 * molecule.num_atoms(), 3 * molecule.num_atoms()))
+    for vector in norm_vectors:
+        sum_of_vectors = np.add(sum_of_vectors,np.outer(vector,vector))
+    projector = np.subtract(projector,sum_of_vectors)
+
+    return projector
+
 def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                             scalefreq=1.0, internal="truhlar", cutoff=100.0,
                             verbosity=0):
-    # Constants
-    # k_boltz() = 1.38064852E-23  # Boltzmann constant in JK⁻¹
-    # h_planck() = 6.626070040E-34  # Planck constant in Js
-    # r_gas() = 8.3144598  # Gas constant in J K⁻¹ mol⁻¹
-    # c_light() = 2.9979258E10  # Speed of light in cm s⁻¹
 
     # Print T and p conditions
     if verbosity >= 2:
@@ -138,7 +196,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
         inertia_moments, inertial_axes = np.linalg.eig(inertia_tensor)
 
         # Orthogonalise eigenvectors (only sometimes necessary)...
-        inertial_axes, r = np.linalg.qr(inertial_axes)
+        # inertial_axes, r = np.linalg.qr(inertial_axes)
 
         # Sort moments from highest to lowest
         idx = inertia_moments.argsort()[::-1]
@@ -205,6 +263,16 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                                         molecule.atm_symbol(j)])
             frequencies, normalModes = np.linalg.eig(molecule.H_mw)
 
+            # Let's build the projector that let's us eliminate the
+            # translational and rotational components of the Hessian
+            if verbosity >= 2:
+                print("\n Projecting out translational and rotational "
+                      "contamination.")
+            projector = translation_rotation_projector(molecule, verbosity=verbosity)
+            projected_hessian = np.dot(projector,molecule.H_mw)
+            projected_hessian = np.dot(projected_hessian,np.transpose(projector))
+            frequencies, normalModes = np.linalg.eig(projected_hessian)
+
             # We need to distinguish two cases: (1) linear molecule with 3N-5 vibrations and (2) non-linear
             # molecules with 3N-6 vibrations.
             if inertia_moments[0] - inertia_moments[1] < 0.0005 and inertia_moments[2] < 0.0005:
@@ -216,7 +284,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                     print(
                         "\n Frequencies that correspond to rotation and translation (lowest 5):")
                     for i in np.sort(frequencies)[:5]:
-                        conversion = 219474.63  # atomic units to cm⁻¹ in a harmonic oscillator
+                        conversion = au_to_wavenumbers()
                         if i < 0.0:
                             sign = -1
                         else:
@@ -225,7 +293,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                         print("{:> 9.2f} cm⁻¹".format(i))
 
                 for i in np.sort(frequencies)[5:]:
-                    conversion = 219474.63  # atomic units to cm⁻¹ in a harmonic oscillator
+                    conversion = au_to_wavenumbers()
                     if i < 0.0:
                         sign = -1
                     else:
@@ -247,7 +315,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                     print(
                         "\n Frequencies that correspond to rotation and translation (lowest 6):")
                     for i in np.sort(frequencies)[:6]:
-                        conversion = 219474.63  # atomic units to cm⁻¹ in a harmonic oscillator
+                        conversion = au_to_wavenumbers()  # atomic units to cm⁻¹ in a harmonic oscillator
                         if i < 0.0:
                             sign = -1
                         else:
@@ -255,7 +323,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                         i = sign * math.sqrt(abs(i)) * conversion
                         print("{:> 9.2f} cm⁻¹".format(i))
                 for i in np.sort(frequencies)[6:]:
-                    conversion = 219474.63  # atomic units to cm⁻¹ in a harmonic oscillator
+                    conversion = au_to_wavenumbers()  # atomic units to cm⁻¹ in a harmonic oscillator
                     if i < 0.0:
                         sign = -1
                     else:
@@ -290,8 +358,8 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                     scalefreq))
             for i in range(0, len(listOfFreqs)):
                 if verbosity >= 1:
-                    print(
-                        " Vibration {} Before: {:> 9.2f} cm⁻¹, After: {:> 9.2f} cm⁻¹".format(
+                    print(" Vibration {} Before: {:> 9.2f} cm⁻¹,"
+                          " After: {:> 9.2f} cm⁻¹".format(
                             i + 1, listOfFreqs[i],
                             listOfFreqs[
                                 i] * scalefreq))
@@ -361,10 +429,9 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
         Qvib = 1.0
         Svib = 0.0
         Evib = 0.0
-        if verbosity >= 2 and internal == "grimme":
-            print("\n Interpolation between entropic contributions from"
-                  " harmonic oscillators and free rotors for low frequency"
-                  " modes:")
+        if verbosity >= 1 and internal == "grimme":
+            print("\n Using Grimme's interpolation scheme for internal"
+                  " rotor treatment.")
         for j, i in enumerate(listOfVibTemps):
             Qvib = Qvib * (math.exp(-1.0 * i / (2.0 * temp))) / (
                     1 - math.exp(-1.0 * i / (temp)))
@@ -392,7 +459,8 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                 # Weighting function to balance between vib and rot entropy
                 w = 1/(1+(((cutoff* c_light())/omega)**4))
                 if verbosity >= 3:
-                    print(" Interpolation for vibration {}: {}% Svib, {}% Srot.".format(j,int(w*100),int((1-w)*100)))
+                    print(" Interpolation for vibration {}: {:.1f}% Svib,"
+                          " {:.1f}% Srot.".format(j,w*100,(1-w)*100))
                 SvibContribution = (w * vibrational_entropy) + (
                             (1 - w) * rotational_entropy)
             else:
@@ -409,11 +477,13 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                         molecule.ZPVEList[j] * hartree_to_j_per_mol())) / hartree_to_j_per_mol())
 
     else:
-        # If there are no vibrations, i.e. for a single atom, the results are straightforward:
-        if verbosity >= 2:
-            print(
-                "\n No vibrational analysis. This is either"
-                " a single atom, or we didn't find any data.")
+        # If there are no vibrations, i.e. for a single atom, the results
+        # are straightforward:
+        if molecule.num_atoms() != 1:
+            msg_program_warning("No vibrational data found!")
+        else:
+            if verbosity >= 2:
+                print("\n No vibrational analysis. This a single atom.")
         Qvib = 1.0
         Svib = 0.0
         molecule.vibS = 0.0

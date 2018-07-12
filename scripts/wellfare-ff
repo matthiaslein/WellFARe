@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 
 import argparse
+import traceback
 from multiprocessing import cpu_count
 
 from wellfare.molecule import Molecule
@@ -43,7 +44,7 @@ def main():
 
     # Print GPL v3 statement and program header
     if args.verbosity >= 1:
-        msg_program_header("WellFARe", 0.9)
+        msg_program_header("WellFARe-FF", 0.9)
 
     molecule = Molecule("Input Structure", 0)
     extract_molecular_data(args.inputfile, molecule, verbosity=args.verbosity)
@@ -52,9 +53,12 @@ def main():
     if args.verbosity >= 1:
         msg_program_footer(prg_start_time)
 
+
 if __name__ == '__main__':
     try:
         main()
+    except KeyboardInterrupt:
+        msg_program_error("Keyboard interrupt by user")
     except:
         error_txt = "This didn't go according to plan: Tell Matthias!"
         error_txt += "\n\n(Please email the command line arguments you"
