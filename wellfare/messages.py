@@ -23,7 +23,7 @@ def msg_timestamp(s, starttime=None):
     return s
 
 
-def msg_program_header(module: str, version: float):
+def msg_program_header(module: str, version: str):
     # ASCII FONTS from: http://patorjk.com/software/taag/
     # Font = "Big"
     print("###################################################")
@@ -35,7 +35,7 @@ def msg_program_header(module: str, version: float):
     print("    \ \/  \/ / _ \ | |  __/ /\ \ |  _  // _ \     ")
     print("     \  /\  /  __/ | | | / ____ \| | \ \  __/     ")
     print("      \/  \/ \___|_|_|_|/_/    \_\_|  \_\___|     ")
-    print("                                  Version {: .2f} ".format(version))
+    print("                                  Version {}      ".format(version))
     print("    WellFARe Copyright (C) 2018 Matthias Lein     ")
     print(" This program comes with ABSOLUTELY NO WARRANTY   ")
     print(" This is free software, and you are welcome to    ")
@@ -84,6 +84,8 @@ def msg_program_error(s: str = "An error has occurred, exiting now",
     print(" |______|_|  |_|  \___/|_|   ", file=destination)
     print(msg_timestamp('Error time/date: ', starttime), file=destination)
     print(s, file=destination)
+    if starttime is not None:
+        print("Total time elapsed {}".format(timer(starttime, time.time())))
     print(
         "###################################################\n",
         file=destination)

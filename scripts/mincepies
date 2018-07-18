@@ -11,6 +11,7 @@ import math
 import os
 import copy
 import numpy as np
+import pkg_resources
 
 from wellfare.messages import *
 from wellfare.atom import Atom
@@ -634,6 +635,8 @@ parser = argparse.ArgumentParser(
     description="MICEPES: Method for the Incremental Construction and "
                 "Exploration of the Potential Energy Surface",
     epilog="recognised file-types: gaussian, orca, turbomole, xyz")
+parser.add_argument("--version", help="prints the version number",
+                    action='store_true')
 parser.add_argument("-v", "--verbosity", help="increase output verbosity",
                     type=int, choices=[0, 1, 2, 3], default=0)
 parser.add_argument("-o", "--output",
@@ -664,13 +667,15 @@ args = parser.parse_args()
 #                                                                             #
 ###############################################################################
 
-def main():
+def main(prg_start_time):
+    if args.version is True:
+        print("Version {}".format(pkg_resources.require("wellfare")[0].version))
+        return
     # Print GPL v3 statement and program header
-    prg_start_time = time.time()
     if args.verbosity >= 1:
-        msg_program_header("MInCEPiES", 1.0)
+        msg_program_header("MInCEPiES", pkg_resources.require("wellfare")[0].version)
 
-    molecule = Molecule("Input Structure", 0)
+    molecule = Molecule("Input Structure")
 
     # No building of internal coordinates if we just want to print the
     # structure. We'll need the energy though.
@@ -937,13 +942,15 @@ def main():
 
 
 if __name__ == '__main__':
+    prg_start_time = time.time()
     try:
-        main()
+        main(prg_start_time)
     except KeyboardInterrupt:
-        msg_program_error("Keyboard interrupt by user")
+        msg_program_error("Keyboard interrupt by user",
+                          starttime=prg_start_time)
     except:
         error_txt = "This didn't go according to plan: Tell Matthias!"
-        error_txt += "\n\n(Please email the command line arguments you"
+        error_txt += "\n\nPlease email the command line arguments you"
         error_txt += " used\ntogether with the files you were analyzing"
         error_txt += " and the\ninformation below (within the"
         error_txt += " exclamation marks)\nto: matthias.lein@gmail.com.\n\n"
@@ -961,4 +968,4 @@ if __name__ == '__main__':
         error_txt += "! Line {} in module {}\n".format(exception_line,
                                                      exception_module)
         error_txt += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-        msg_program_error(error_txt)
+        msg_program_error(error_txt, starttime=prg_start_time)

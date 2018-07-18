@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='wellfare',
-    version='1.0.4',
+    version='1.0.5',
     python_requires='>=3.4',
     install_requires=['scipy', 'numpy', 'matplotlib', 'typing'],
     packages=['wellfare'],

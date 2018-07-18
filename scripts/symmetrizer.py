@@ -1,0 +1,97 @@
+#!/usr/local/bin/python3
+#############################################################################
+#                                                                            #
+# This is the part of the program where modules are imported                 #
+#                                                                            #
+##############################################################################
+
+import traceback
+import argparse
+import math
+import pkg_resources
+
+from multiprocessing import cpu_count
+
+from wellfare.messages import *
+from wellfare.molecule import Molecule
+from wellfare.qmparser import extract_molecular_data
+from wellfare.thermochemistry import thermochemical_analysis
+
+
+###############################################################################
+#                                                                             #
+# This is the part of the program where the symmetrization is done            #
+#                                                                             #
+###############################################################################
+
+
+
+############################################################################
+#                                                                          #
+# This is the part of the program where the cmd line arguments are defined #
+#                                                                          #
+############################################################################
+
+parser = argparse.ArgumentParser(
+    description="symmetrizer: A program to symmetrize coordinates to the"
+                " closest point-group symmetry.",
+    epilog="recognised filetypes: gaussian, orca, turbomole, adf")
+parser.add_argument("--version", help="prints the version number",
+                    action='store_true')
+parser.add_argument("-P", "--numproc", type=int, help="number of processes "
+                                                      "for parallel execution",
+                    default="0")
+parser.add_argument("file1", help="input file with the molecular structure")
+
+parser.add_argument("-v", "--verbosity", help="increase output verbosity",
+                    type=int, choices=[0, 1, 2, 3], default=0)
+
+args = parser.parse_args()
+
+# Default number of cores for processing is requested with "-p 0" and uses
+# all available cores.
+if args.numproc == 0:
+    args.numproc = cpu_count()
+
+###############################################################################
+#                                                                             #
+# The main part of the program starts here                                    #
+#                                                                             #
+###############################################################################
+
+def main(prg_start_time):
+    if args.version is True:
+        print("Version {}".format(pkg_resources.require("wellfare")[0].version))
+        return
+    # Print GPL v3 statement and program header
+    if args.verbosity >= 1:
+        msg_program_header("Symmetrizer", pkg_resources.require("wellfare")[0].version)
+
+if __name__ == '__main__':
+    prg_start_time = time.time()
+    try:
+        main(prg_start_time)
+    except KeyboardInterrupt:
+        msg_program_error("Keyboard interrupt by user",
+                          starttime=prg_start_time)
+    except:
+        error_txt = "This didn't go according to plan: Tell Matthias!"
+        error_txt += "\n\nPlease email the command line arguments you"
+        error_txt += " used\ntogether with the files you were analyzing"
+        error_txt += " and the\ninformation below (within the"
+        error_txt += " exclamation marks)\nto: matthias.lein@gmail.com.\n\n"
+        error_txt += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+
+        # Get info about the exception
+        exceptiondata = traceback.format_exc().splitlines()
+        # Extract from this data: Exception type first, then traceback
+        exception_type = exceptiondata[-1]
+        exception_line = exceptiondata[-3].split()[3]
+        exception_module = exceptiondata[-3].split()[5]
+        # Print exception type
+        error_txt += "! {}\n".format(exception_type)
+        # Print line number and module
+        error_txt += "! Line {} in module {}\n".format(exception_line,
+                                                     exception_module)
+        error_txt += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+        msg_program_error(error_txt, starttime=prg_start_time)

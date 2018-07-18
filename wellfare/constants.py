@@ -1,7 +1,6 @@
 ###############################################################################
 # Dictionaries with constants from the periodic table are defined here
 ###############################################################################
-import math
 
 # Dictionary to convert atomic symbols to atomic numbers
 symbol_to_number = {

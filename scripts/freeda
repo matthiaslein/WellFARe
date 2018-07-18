@@ -8,6 +8,7 @@
 import traceback
 import argparse
 import math
+import pkg_resources
 
 from multiprocessing import cpu_count
 
@@ -321,6 +322,8 @@ def thermochemical_comparison(reactants, products, temp=298.15, press=101325.0,
 parser = argparse.ArgumentParser(
     description="freeda: Free Energy Decomposition Analysis",
     epilog="recognised filetypes: gaussian, orca, turbomole, adf")
+parser.add_argument("--version", help="prints the version number",
+                    action='store_true')
 parser.add_argument("-P", "--numproc", type=int, help="number of processes "
                                                       "for parallel execution",
                     default="0")
@@ -386,15 +389,17 @@ elif args.internal == "grimme" and args.cutoff is None:
 #                                                                             #
 ###############################################################################
 
-def main():
+def main(prg_start_time):
+    if args.version is True:
+        print("Version {}".format(pkg_resources.require("wellfare")[0].version))
+        return
     # Print GPL v3 statement and program header
-    prg_start_time = time.time()
     if args.verbosity >= 1:
-        msg_program_header("Freeda", 1.0)
+        msg_program_header("Freeda", pkg_resources.require("wellfare")[0].version)
 
     list_of_reactants = []
     if type(args.reactants) is str:
-        list_of_reactants.append(Molecule(args.reactants, 0))
+        list_of_reactants.append(Molecule(args.reactants))
         extract_molecular_data(args.reactants, list_of_reactants[-1],
                                verbosity=args.verbosity, read_coordinates=True,
                                read_bond_orders=True, build_angles=True,
@@ -408,7 +413,7 @@ def main():
                                 verbosity=args.verbosity)
     else:
         for i in args.reactants:
-            list_of_reactants.append(Molecule(i, 0))
+            list_of_reactants.append(Molecule(i))
             extract_molecular_data(i, list_of_reactants[-1],
                                    verbosity=args.verbosity,
                                    read_coordinates=True,
@@ -427,7 +432,7 @@ def main():
 
     list_of_products = []
     if args.products is not None and type(args.products) is str:
-        list_of_products.append(Molecule(args.products, 0))
+        list_of_products.append(Molecule(args.products))
         extract_molecular_data(args.products, list_of_products[-1],
                                verbosity=args.verbosity, read_coordinates=True,
                                read_bond_orders=True, build_angles=True,
@@ -441,7 +446,7 @@ def main():
                                 verbosity=args.verbosity)
     elif args.products is not None:
         for i in args.products:
-            list_of_products.append(Molecule(i, 0))
+            list_of_products.append(Molecule(i))
             extract_molecular_data(i, list_of_products[-1],
                                    verbosity=args.verbosity,
                                    read_coordinates=True,
@@ -470,13 +475,15 @@ def main():
 
 
 if __name__ == '__main__':
+    prg_start_time = time.time()
     try:
-        main()
+        main(prg_start_time)
     except KeyboardInterrupt:
-        msg_program_error("Keyboard interrupt by user")
+        msg_program_error("Keyboard interrupt by user",
+                          starttime=prg_start_time)
     except:
         error_txt = "This didn't go according to plan: Tell Matthias!"
-        error_txt += "\n\n(Please email the command line arguments you"
+        error_txt += "\n\nPlease email the command line arguments you"
         error_txt += " used\ntogether with the files you were analyzing"
         error_txt += " and the\ninformation below (within the"
         error_txt += " exclamation marks)\nto: matthias.lein@gmail.com.\n\n"
@@ -494,4 +501,4 @@ if __name__ == '__main__':
         error_txt += "! Line {} in module {}\n".format(exception_line,
                                                      exception_module)
         error_txt += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-        msg_program_error(error_txt)
+        msg_program_error(error_txt, starttime=prg_start_time)
