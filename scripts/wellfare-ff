@@ -3,6 +3,7 @@
 import argparse
 import traceback
 import pkg_resources
+import scipy.optimize
 
 from multiprocessing import cpu_count
 
@@ -66,10 +67,27 @@ def main(main_start_time):
 
     molecular_force_field = ForceField(molecule,
                                        parametrize_bond_stretches=True,
+                                       parametrize_angle_bends=True,
                                        verbosity=args.verbosity)
-    print(molecular_force_field.coordinates())
-    print(molecular_force_field.force_constants())
-    print(molecular_force_field.total_energy(molecular_force_field.coordinates()))
+
+    print("\nInitial geometry")
+    print(molecule.print_mol(output="internals"))
+
+    initialcoords2optimiseR = molecular_force_field.coordinates()
+    # print("\n Initial energy: {}".format(
+    #     molecular_force_field.total_energy(initialcoords2optimiseR)))
+
+    initialcoords2optimiseR[6] = initialcoords2optimiseR[6] + 5.0
+
+
+    print("\nOptimising geometry of molecule:")
+    xopt = scipy.optimize.fmin_bfgs(molecular_force_field.total_energy,
+                                    initialcoords2optimiseR, gtol=0.00005)
+
+    print("\nOptimized Geometry:")
+    new_coordinates = xopt * bohr_to_ang(1.0)
+    molecule.set_coordinates(new_coordinates)
+    print(molecule.print_mol(output="internals"))
 
     # Print program footer
     if args.verbosity >= 1:

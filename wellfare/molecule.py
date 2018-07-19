@@ -266,10 +266,7 @@ class Molecule:
                 exists = True
 
         # Append dihedral to list if doesn't exist and is plausible
-        if exists is False and a >= 0 and b >= 0 and c >= 0 and d >= 0 and \
-                a <= len(self.atoms) and b <= len(self.atoms) and \
-                c <= len(self.atoms) and d <= len(self.atoms) and \
-                a != b and a != c and a != d and b != c and b != d and c != d:
+        if exists is False:
             self.dihedrals.append([a, b, c, d])
 
     def atm_symbol(self, i: int) -> str:
@@ -480,6 +477,19 @@ class Molecule:
 
         self.charge = charge
 
+    def set_coordinates(self, coordinates) -> None:
+        """
+        Set all molecular coordinates at once
+        :param coordinates: List of molecular xyz coordinates in Å
+        :return: None
+        """
+
+        for idx, atom in enumerate(self.atoms):
+            atom.set_x(coordinates[idx * 3])
+            atom.set_y(coordinates[idx * 3 + 1])
+            atom.set_z(coordinates[idx * 3 + 2])
+
+
     def print_mol(self, output: str = "cart", comment: Optional[str] = None,
                   file: Optional[str] = None) -> str:
         """
@@ -557,6 +567,31 @@ class Molecule:
                         i.xpos(),
                         i.ypos(),
                         i.zpos())
+                s = s + t
+            s = s + "\n"
+        elif output == "internals":
+            # Print all bond lengths, angles and dihedrals
+            s = "\n"
+            for i in self.bonds:
+                t = " {:<3} ({:4d}) {:<3} ({:4d}) Distance" \
+                    " {: 0.3f} Å\n".format(
+                    self.atm_symbol(i[0]), i[0], self.atm_symbol(i[1]), i[1],
+                    self.atm_atm_dist(i[0], i[1]))
+                s = s + t
+            for i in self.angles:
+                t = " {:<3} ({:4d}) {:<3} ({:4d}) {:<3} ({:4d})" \
+                    " Angle {: 7.2f}° \n".format(
+                    self.atm_symbol(i[0]), i[0], self.atm_symbol(i[1]), i[1],
+                    self.atm_symbol(i[2]), i[2],
+                    math.degrees(self.atm_atm_atm_angle(i[0], i[1], i[2])))
+                s = s + t
+            for i in self.dihedrals:
+                t = " {:<3} ({:4d}) {:<3} ({:4d}) {:<3} ({:4d}) {:<3} ({:4d})" \
+                    " Angle {: 7.2f}° \n".format(
+                    self.atm_symbol(i[0]), i[0], self.atm_symbol(i[1]), i[1],
+                    self.atm_symbol(i[2]), i[2], self.atm_symbol(i[3]), i[3],
+                    math.degrees(
+                        self.atm_atm_atm_atm_dihedral(i[0], i[1], i[2], i[3])))
                 s = s + t
             s = s + "\n"
 
@@ -639,7 +674,7 @@ def batch_identify_dihedrals(molecule, chunk_start, chunk_end, verbosity=0):
                         molecule.angles[j][2]))
                 results.append(
                     [molecule.angles[i][2], molecule.angles[i][1],
-                     molecule.angles[j][1], molecule.angles[j][1], angle])
+                     molecule.angles[j][1], molecule.angles[j][2], angle])
                 if verbosity >= 3:
                     print(
                         " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d})"
@@ -727,9 +762,8 @@ def build_molecular_dihedrals(molecule, verbosity=0, deletefirst=True,
             # If called for, we sort the list of angles (might be in arbitrary
             # order because of asynchronous parallelism "apply_async" above).
             zipped_list = sorted(
-                list(zip(molecule.angles, list_of_dihedrals)))
-            molecule.angles, list_of_dihedrals = list(zip(*zipped_list))
-
+                list(zip(molecule.dihedrals, list_of_dihedrals)))
+            molecule.dihedrals, list_of_dihedrals = list(zip(*zipped_list))
     else:
         if verbosity >= 2:
             print("\nNot looking for dihedrals in WellFARe molecule: ",
