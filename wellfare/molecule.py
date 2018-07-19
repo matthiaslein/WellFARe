@@ -41,9 +41,9 @@ class Molecule:
         self.bonds = []  # Initially an empty list
         self.angles = []  # Initially an empty list
         self.dihedrals = []  # Initially an empty list
-        self.H_QM = np.zeros((3,3))  # Force constants, Array size arbitrary,
+        self.H_QM = np.zeros((3, 3))  # Force constants, Array size arbitrary,
                                      # just a placeholder for type
-        self.H_mw = np.zeros((3,3))  # Mass weighted force constants
+        self.H_mw = np.zeros((3, 3))  # Mass weighted force constants
         self.frequencies = []  # List of vibrational frequencies in cm ⁻¹
         self.sigmaRot = 1  # Rotational symmetry number
         self.qm_energy = 0.0  # electronic energy in Hartree
@@ -489,7 +489,6 @@ class Molecule:
             atom.set_y(coordinates[idx * 3 + 1])
             atom.set_z(coordinates[idx * 3 + 2])
 
-
     def print_mol(self, output: str = "cart", comment: Optional[str] = None,
                   file: Optional[str] = None) -> str:
         """
@@ -573,23 +572,27 @@ class Molecule:
             # Print all bond lengths, angles and dihedrals
             s = "\n"
             for i in self.bonds:
-                t = " {:<3} ({:4d}) {:<3} ({:4d}) Distance" \
-                    " {: 0.3f} Å\n".format(
-                    self.atm_symbol(i[0]), i[0], self.atm_symbol(i[1]), i[1],
+                t = " {:<3} ({:4d}) {:<3} ({:4d})" \
+                    " Distance {: 0.3f} Å\n".format(
+                    self.atm_symbol(i[0]), i[0] + 1, self.atm_symbol(i[1]),
+                                           i[1] + 1,
                     self.atm_atm_dist(i[0], i[1]))
                 s = s + t
             for i in self.angles:
                 t = " {:<3} ({:4d}) {:<3} ({:4d}) {:<3} ({:4d})" \
                     " Angle {: 7.2f}° \n".format(
-                    self.atm_symbol(i[0]), i[0], self.atm_symbol(i[1]), i[1],
-                    self.atm_symbol(i[2]), i[2],
+                    self.atm_symbol(i[0]), i[0] + 1, self.atm_symbol(i[1]),
+                                           i[1] + 1,
+                    self.atm_symbol(i[2]), i[2] + 1,
                     math.degrees(self.atm_atm_atm_angle(i[0], i[1], i[2])))
                 s = s + t
             for i in self.dihedrals:
-                t = " {:<3} ({:4d}) {:<3} ({:4d}) {:<3} ({:4d}) {:<3} ({:4d})" \
-                    " Angle {: 7.2f}° \n".format(
-                    self.atm_symbol(i[0]), i[0], self.atm_symbol(i[1]), i[1],
-                    self.atm_symbol(i[2]), i[2], self.atm_symbol(i[3]), i[3],
+                t = " {:<3} ({:4d}) {:<3} ({:4d}) {:<3} ({:4d}) {:<3}" \
+                    " ({:4d}) Angle {: 6.1f}° \n".format(
+                    self.atm_symbol(i[0]), i[0] + 1, self.atm_symbol(i[1]),
+                                           i[1] + 1,
+                    self.atm_symbol(i[2]), i[2] + 1, self.atm_symbol(i[3]),
+                                           i[3] + 1,
                     math.degrees(
                         self.atm_atm_atm_atm_dihedral(i[0], i[1], i[2], i[3])))
                 s = s + t

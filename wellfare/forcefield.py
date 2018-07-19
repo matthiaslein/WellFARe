@@ -4,6 +4,7 @@
 
 import math
 import numpy as np
+import scipy.optimize
 
 from wellfare.messages import *
 from wellfare.constants import *
@@ -273,22 +274,32 @@ class FFBend:
     """
         self.k_bend = new_k
 
-    def energy(self, a):
+    def energy(self, a, alternative_k=None):
         """ Returns the energy of this bending potential at angle a"""
 
         energy = 0.0
         if self.kind == 1:
             # Simple harmonic potential
-            energy = pot_harmonic(a, self.a0, self.k_bend)
+            if alternative_k is None:
+                energy = pot_harmonic(a, self.a0, self.k_bend)
+            else:
+                energy = pot_harmonic(a, self.a0, alternative_k)
         elif self.kind == 2:
             # Distance dependent damped harmonic potential
             if (math.pi - 0.01) <= self.a0 <= (math.pi + 0.01):
-                # Tolerance used here is essentially a placeholder,
+                # Tolerance used above is essentially a placeholder,
                 # may need changing in either direction.
-                energy = pot_bend_near_linear(a, self.a0, self.k_bend,
-                                              self.f_dmp)
+                if alternative_k is None:
+                    energy = pot_bend_near_linear(a, self.a0, self.k_bend,
+                                                  self.f_dmp)
+                else:
+                    energy = pot_bend_near_linear(a, self.a0, alternative_k,
+                                                  self.f_dmp)
             else:
-                energy = pot_bend(a, self.a0, self.k_bend, self.f_dmp)
+                if alternative_k is None:
+                    energy = pot_bend(a, self.a0, self.k_bend, self.f_dmp)
+                else:
+                    energy = pot_bend(a, self.a0, alternative_k, self.f_dmp)
 
         return energy
 
@@ -358,9 +369,9 @@ class ForceField:
                 if verbosity >= 3:
                     print(" {:<3} ({:3d}) and {:<3} ({:3d}) (Force constant:"
                           " {: .3f})".format(molecule.atoms[bond[0]].symbol(),
-                                             bond[0],
+                                             bond[0] + 1,
                                              molecule.atoms[bond[1]].symbol(),
-                                             bond[1], fc))
+                                             bond[1] + 1, fc))
 
                 # Add as harmonic potential
                 new_stretch = FFStretch(bond[0], bond[1], r0=ang_to_bohr(
@@ -410,13 +421,14 @@ class ForceField:
                 #                         " than 0.002")
                 if verbosity >= 3:
                     print(
-                        " {:<3} ({:3d}), {:<3} ({:3d}) and {:<3} ({:3d}) (Force constant: {: .3f})".format(
+                        " {:<3} ({:3d}), {:<3} ({:3d}) and {:<3} ({:3d})"
+                        " (Force constant: {: .3f})".format(
                             molecule.atoms[angle[0]].symbol(),
-                            angle[0],
+                            angle[0] + 1,
                             molecule.atoms[angle[1]].symbol(),
-                            angle[1],
+                            angle[1] + 1,
                             molecule.atoms[angle[2]].symbol(),
-                            angle[2], fc))
+                            angle[2] + 1, fc))
                 new_bend = FFBend(angle[0],
                                    angle[1],
                                    angle[2],
@@ -472,6 +484,14 @@ class ForceField:
             coordinates.append(ang_to_bohr(atom.zpos()))
         return coordinates
 
+    def coefficients(self):
+        coefficients = []
+        for stretch in self.stretches:
+            coefficients.append(stretch.k_str)
+        for bend in self.bends:
+            coefficients.append(bend.k_bend)
+        return coefficients
+
     def force_constants(self):
         constants = []
         for stretch in self.stretches:
@@ -479,6 +499,24 @@ class ForceField:
         for bend in self.bends:
             constants.append(bend.k_bend)
         return constants
+
+    def gradient(self, coords=None):
+        # The force-field gradient with respect to coordinates
+        if coords is None:
+            coords = self.coordinates()
+
+        epsilon = 1E-5
+        return scipy.optimize.approx_fprime(coords, self.total_energy,
+                                            epsilon)
+
+    def gradient_coeff(self, coeff=None):
+        # The force-field gradient with respect to ff-coefficients
+        if coeff is None:
+            coeff = self.coefficients()
+
+        epsilon = 1E-5
+        return scipy.optimize.approx_fprime(coeff, self.total_energy_coeff,
+                                            epsilon)
 
     def total_energy(self, coordinates):
         energy = self.energy_baseline
@@ -553,5 +591,85 @@ class ForceField:
             #     print("Some other bending potential")
             # print("Bend contribution: {}".format(bend.energy(theta)))
             energy += bend.energy(theta)
+
+        return energy
+
+    def total_energy_coeff(self, coefficients):
+        # Calculate the energy as a function of the coefficients
+        energy = self.energy_baseline
+        coordinates = self.coordinates()
+
+        for idx, stretch in enumerate(self.stretches):
+            atom1_x_coord = coordinates[stretch.atom1 * 3]
+            atom1_y_coord = coordinates[stretch.atom1 * 3 + 1]
+            atom1_z_coord = coordinates[stretch.atom1 * 3 + 2]
+            atom2_x_coord = coordinates[stretch.atom2 * 3]
+            atom2_y_coord = coordinates[stretch.atom2 * 3 + 1]
+            atom2_z_coord = coordinates[stretch.atom2 * 3 + 2]
+
+            x_squared = (atom1_x_coord-atom2_x_coord)**2
+            y_squared = (atom1_y_coord-atom2_y_coord)**2
+            z_squared = (atom1_z_coord-atom2_z_coord)**2
+            dist = math.sqrt(x_squared + y_squared + z_squared)
+
+            # if stretch.kind == 1:
+            #     print("Harmonic stretching potential")
+            # elif stretch.kind == 2:
+            #     print("Generalised Lennard-Jones potential")
+            # else:
+            #     print("Some other potential")
+            # print("Stretch contribution: {}".format(stretch.energy(dist)))
+            energy += stretch.energy(dist, alternative_k=coefficients[idx])
+
+        offset = len(self.stretches)
+        for idx, bend in enumerate(self.bends):
+            atom1_x_coord = coordinates[bend.atom1 * 3]
+            atom1_y_coord = coordinates[bend.atom1 * 3 + 1]
+            atom1_z_coord = coordinates[bend.atom1 * 3 + 2]
+            atom2_x_coord = coordinates[bend.atom2 * 3]
+            atom2_y_coord = coordinates[bend.atom2 * 3 + 1]
+            atom2_z_coord = coordinates[bend.atom2 * 3 + 2]
+            atom3_x_coord = coordinates[bend.atom3 * 3]
+            atom3_y_coord = coordinates[bend.atom3 * 3 + 1]
+            atom3_z_coord = coordinates[bend.atom3 * 3 + 2]
+
+            # Calculate the distance between each pair of atoms
+            x_squared = (atom1_x_coord - atom2_x_coord) ** 2
+            y_squared = (atom1_y_coord - atom2_y_coord) ** 2
+            z_squared = (atom1_z_coord - atom2_z_coord) ** 2
+            d_bond_1 = math.sqrt(x_squared + y_squared + z_squared)
+
+            x_squared = (atom2_x_coord - atom3_x_coord) ** 2
+            y_squared = (atom2_y_coord - atom3_y_coord) ** 2
+            z_squared = (atom2_z_coord - atom3_z_coord) ** 2
+            d_bond_2 = math.sqrt(x_squared + y_squared + z_squared)
+
+            x_squared = (atom1_x_coord - atom3_x_coord) ** 2
+            y_squared = (atom1_y_coord - atom3_y_coord) ** 2
+            z_squared = (atom1_z_coord - atom3_z_coord) ** 2
+            d_non_bond = math.sqrt(x_squared + y_squared + z_squared)
+
+            # Use those distances and the cosine rule to calculate bond
+            # angle theta
+            numerator = d_bond_1 ** 2 + d_bond_2 ** 2 - d_non_bond ** 2
+            denominator = 2 * d_bond_1 * d_bond_2
+            argument = numerator / denominator
+            # This is a safety check to account for numerical noise that might
+            # screw up angles in linear molecules ...
+            if argument > 1.0:
+                argument = 1.0
+            elif argument < -1.0:
+                argument = -1.0
+            theta = np.arccos(argument)
+
+            # if bend.kind == 1:
+            #     print("Harmonic bending potential")
+            # elif bend.kind == 2:
+            #     print("Distance damped harmonic bending potential")
+            # else:
+            #     print("Some other bending potential")
+            # print("Bend contribution: {}".format(bend.energy(theta)))
+            energy += bend.energy(theta,
+                                  alternative_k=coefficients[idx + offset])
 
         return energy

@@ -78,16 +78,24 @@ def main(main_start_time):
     #     molecular_force_field.total_energy(initialcoords2optimiseR)))
 
     initialcoords2optimiseR[6] = initialcoords2optimiseR[6] + 5.0
-
+    # print("Energy:")
+    # print(molecular_force_field.total_energy(initialcoords2optimiseR))
+    print("Gradient:")
+    print(molecular_force_field.gradient())
+    print(molecular_force_field.gradient_coeff())
 
     print("\nOptimising geometry of molecule:")
     xopt = scipy.optimize.fmin_bfgs(molecular_force_field.total_energy,
-                                    initialcoords2optimiseR, gtol=0.00005)
+                                    initialcoords2optimiseR, gtol=0.00001)
 
     print("\nOptimized Geometry:")
     new_coordinates = xopt * bohr_to_ang(1.0)
     molecule.set_coordinates(new_coordinates)
     print(molecule.print_mol(output="internals"))
+
+    print("Energy:")
+    print(molecular_force_field.total_energy_coeff(molecular_force_field.coefficients()))
+
 
     # Print program footer
     if args.verbosity >= 1:
