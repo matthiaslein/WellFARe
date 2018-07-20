@@ -25,16 +25,6 @@ def pot_harmonic(a, a0, k):
     return u
 
 
-def pot_morse(r, r0, d, b):
-    """
-    Morse oscillator potential
-    """
-
-    u = d * (1 - math.exp(-b * (r - r0))) ** 2
-
-    return u
-
-
 def damping_function(a, b, r):
     """
     Distance dependent damping function for atoms with symbols a and b,
@@ -477,6 +467,8 @@ class ForceField:
         self.bends.append(bend)
 
     def coordinates(self):
+        # Returns the current coordinates the force-field is set to
+        # (in Bohr, not in Ångstrom)
         coordinates = []
         for atom in self.atoms:
             coordinates.append(ang_to_bohr(atom.xpos()))
@@ -484,7 +476,7 @@ class ForceField:
             coordinates.append(ang_to_bohr(atom.zpos()))
         return coordinates
 
-    def coefficients(self):
+    def ff_coefficients(self):
         coefficients = []
         for stretch in self.stretches:
             coefficients.append(stretch.k_str)
@@ -492,112 +484,54 @@ class ForceField:
             coefficients.append(bend.k_bend)
         return coefficients
 
-    def force_constants(self):
-        constants = []
-        for stretch in self.stretches:
-            constants.append(stretch.k_str)
-        for bend in self.bends:
-            constants.append(bend.k_bend)
-        return constants
-
-    def gradient(self, coords=None):
+    def ff_gradient(self, coordinates=None, coefficients=None):
         # The force-field gradient with respect to coordinates
-        if coords is None:
-            coords = self.coordinates()
+        if coordinates is None:
+            coordinates = self.coordinates()
+        if coefficients is None:
+            coefficients = self.ff_coefficients()
 
+        return scipy.optimize.approx_fprime(coordinates, self.ff_energy,
+                                            1E-8, coefficients)
+
+    def ff_hessian(self, coordinates=None, coefficients=None):
+        # The force-field hessian with respect to coordinates
         epsilon = 1E-5
-        return scipy.optimize.approx_fprime(coords, self.total_energy,
-                                            epsilon)
+        if coordinates is None:
+            coordinates = self.coordinates()
+        if coefficients is None:
+            coefficients = self.ff_coefficients()
 
-    def gradient_coeff(self, coeff=None):
-        # The force-field gradient with respect to ff-coefficients
-        if coeff is None:
-            coeff = self.coefficients()
+        # Calculate gradient at given coordinates
+        grad = self.ff_gradient(coordinates=coordinates,
+                                coefficients=coefficients)
 
-        epsilon = 1E-5
-        return scipy.optimize.approx_fprime(coeff, self.total_energy_coeff,
-                                            epsilon)
+        # Initialise empty matrix for Hessian
+        hess = np.zeros((len(coordinates), len(coordinates)))
 
-    def total_energy(self, coordinates):
-        energy = self.energy_baseline
+        # Loop over rows...
+        for i in range(len(coordinates)):
+            # Copy coordinates
+            displaced_coords = coordinates
+            # Displace current coordinate
+            displaced_coords[i] = coordinates[i] + epsilon
+            # Calculate gradient at this new coordinate
+            other_grad = self.ff_gradient(coordinates=displaced_coords,
+                                          coefficients=coefficients)
+            # Place the calculated second derivatives for coordinate
+            # i into the ith column of the Hessian matrix
+            hess[:, i] = (other_grad - grad) / epsilon
 
-        for stretch in self.stretches:
-            atom1_x_coord = coordinates[stretch.atom1 * 3]
-            atom1_y_coord = coordinates[stretch.atom1 * 3 + 1]
-            atom1_z_coord = coordinates[stretch.atom1 * 3 + 2]
-            atom2_x_coord = coordinates[stretch.atom2 * 3]
-            atom2_y_coord = coordinates[stretch.atom2 * 3 + 1]
-            atom2_z_coord = coordinates[stretch.atom2 * 3 + 2]
+        return hess
 
-            x_squared = (atom1_x_coord-atom2_x_coord)**2
-            y_squared = (atom1_y_coord-atom2_y_coord)**2
-            z_squared = (atom1_z_coord-atom2_z_coord)**2
-            dist = math.sqrt(x_squared + y_squared + z_squared)
-
-            # if stretch.kind == 1:
-            #     print("Harmonic stretching potential")
-            # elif stretch.kind == 2:
-            #     print("Generalised Lennard-Jones potential")
-            # else:
-            #     print("Some other potential")
-            # print("Stretch contribution: {}".format(stretch.energy(dist)))
-            energy += stretch.energy(dist)
-
-        for bend in self.bends:
-            atom1_x_coord = coordinates[bend.atom1 * 3]
-            atom1_y_coord = coordinates[bend.atom1 * 3 + 1]
-            atom1_z_coord = coordinates[bend.atom1 * 3 + 2]
-            atom2_x_coord = coordinates[bend.atom2 * 3]
-            atom2_y_coord = coordinates[bend.atom2 * 3 + 1]
-            atom2_z_coord = coordinates[bend.atom2 * 3 + 2]
-            atom3_x_coord = coordinates[bend.atom3 * 3]
-            atom3_y_coord = coordinates[bend.atom3 * 3 + 1]
-            atom3_z_coord = coordinates[bend.atom3 * 3 + 2]
-
-            # Calculate the distance between each pair of atoms
-            x_squared = (atom1_x_coord - atom2_x_coord) ** 2
-            y_squared = (atom1_y_coord - atom2_y_coord) ** 2
-            z_squared = (atom1_z_coord - atom2_z_coord) ** 2
-            d_bond_1 = math.sqrt(x_squared + y_squared + z_squared)
-
-            x_squared = (atom2_x_coord - atom3_x_coord) ** 2
-            y_squared = (atom2_y_coord - atom3_y_coord) ** 2
-            z_squared = (atom2_z_coord - atom3_z_coord) ** 2
-            d_bond_2 = math.sqrt(x_squared + y_squared + z_squared)
-
-            x_squared = (atom1_x_coord - atom3_x_coord) ** 2
-            y_squared = (atom1_y_coord - atom3_y_coord) ** 2
-            z_squared = (atom1_z_coord - atom3_z_coord) ** 2
-            d_non_bond = math.sqrt(x_squared + y_squared + z_squared)
-
-            # Use those distances and the cosine rule to calculate bond
-            # angle theta
-            numerator = d_bond_1 ** 2 + d_bond_2 ** 2 - d_non_bond ** 2
-            denominator = 2 * d_bond_1 * d_bond_2
-            argument = numerator / denominator
-            # This is a safety check to account for numerical noise that might
-            # screw up angles in linear molecules ...
-            if argument > 1.0:
-                argument = 1.0
-            elif argument < -1.0:
-                argument = -1.0
-            theta = np.arccos(argument)
-
-            # if bend.kind == 1:
-            #     print("Harmonic bending potential")
-            # elif bend.kind == 2:
-            #     print("Distance damped harmonic bending potential")
-            # else:
-            #     print("Some other bending potential")
-            # print("Bend contribution: {}".format(bend.energy(theta)))
-            energy += bend.energy(theta)
-
-        return energy
-
-    def total_energy_coeff(self, coefficients):
+    def ff_energy(self, coordinates=None, coefficients=None):
         # Calculate the energy as a function of the coefficients
         energy = self.energy_baseline
-        coordinates = self.coordinates()
+
+        if coordinates is None:
+            coordinates = self.coordinates()
+        if coefficients is None:
+            coefficients = self.ff_coefficients()
 
         for idx, stretch in enumerate(self.stretches):
             atom1_x_coord = coordinates[stretch.atom1 * 3]
