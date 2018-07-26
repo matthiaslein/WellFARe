@@ -96,9 +96,13 @@ def translation_rotation_projector(molecule, axes = None, verbosity=0, algorithm
 
     return projector
 
-def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
-                            scalefreq=1.0, internal="truhlar", cutoff=100.0,
+def thermochemical_analysis(molecule, hessian=None, temp=298.15,
+                            press=101325.0,
+                            scalefreq=1.0, internal="none", cutoff=100.0,
                             verbosity=0):
+    # If no particular Hessian was provided, we'll use the QM one.
+    if hessian is None:
+        hessian = molecule.H_QM
 
     # Print T and p conditions
     if verbosity >= 2:
@@ -262,20 +266,20 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
                 molecule.rotS))
 
     if molecule.num_atoms() != 1 and (
-            molecule.H_QM != [] or molecule.frequencies != []):
+            hessian != [] or molecule.frequencies != []):
         # If we didn't read frequencies from file, calculate them from force constants
         listOfFreqs = []
         if molecule.frequencies == []:
             if verbosity >= 2:
                 print("\n Vibrational analysis:")
             # First, we need to form the mass-weighted force-constant matrix
-            molecule.H_mw = np.zeros((len(molecule.H_QM), len(molecule.H_QM)))
+            molecule.H_mw = np.zeros((len(hessian), len(hessian)))
             for i in range(0, molecule.num_atoms()):
                 for j in range(0, molecule.num_atoms()):
                     for h in range(0, 3):
                         for l in range(0, 3):
                             molecule.H_mw[3 * i + h][3 * j + l] = \
-                                molecule.H_QM[3 * i + h][
+                                hessian[3 * i + h][
                                     3 * j + l] / math.sqrt(
                                     symbol_to_au_mass[
                                         molecule.atm_symbol(i)] *
@@ -557,7 +561,7 @@ def thermochemical_analysis(molecule, temp=298.15, press=101325.0,
     molecule.negTS = (
             -1.0 * temp * Stot / hartree_to_j_per_mol())  # Total entropic contribution TS
     Gtot = Htot + molecule.negTS
-    if molecule.frequencies == [] and molecule.H_QM == []:
+    if molecule.frequencies == [] and hessian == []:
         msg_program_warning(
             "\nCareful! We don't have any vibrational data for this"
             " compound!\nDon't use any of the derived thermodynamic"

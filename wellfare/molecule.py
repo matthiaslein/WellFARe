@@ -596,7 +596,6 @@ class Molecule:
                     math.degrees(
                         self.atm_atm_atm_atm_dihedral(i[0], i[1], i[2], i[3])))
                 s = s + t
-            s = s + "\n"
 
         if file is not None:
             # Try filename for writability first
