@@ -22,7 +22,7 @@ def pot_harmonic(a, a0, k):
     Harmonic potential (for stretches and bends)
     """
 
-    u = 0.5 * k * (a - a0) ** 2
+    u = 0.5 * k * ((a - a0) ** 2)
 
     return u
 
@@ -48,14 +48,29 @@ def damping_function(a, b, r):
 
 def pot_bend(a, a0, k_bend, f_damp=1.0):
     """
-    Double minimum bending potential
+    harmonic (i.e. quadratic) ending potential
     """
 
-    # u = k_bend * f_damp * ((math.cos(a0) - math.cos(a)) ** 2)
     u = k_bend * f_damp * ((a0 - a) ** 2)
 
     return u
 
+def dihedral_pot_bend(theta, theta0, k_tors, f_damp=1.0):
+    """
+    harmonic (i.e. quadratic) ending potential
+    """
+
+    # Calculating the difference for dihedral angles is a little complicated
+    # because of the periodicity. For this "hack potential", we use the exact
+    # Δθ calculation to make sure we don't get negative energies for negative
+    # equilibrium dihedrals.
+    # delta_theta = 180 - math.fabs(math.fabs(theta0 - theta) - 180)
+    #
+    # u = k_tors * f_damp * (delta_theta ** 2)
+
+    u = k_tors * (1 + np.cos(math.radians(180) + theta - theta0))
+
+    return u
 
 def lennard_jones_exponent(a, b):
     """
@@ -82,14 +97,6 @@ def pot_generalised_lennard_jones(r, r0, k_str, a):
 
     return u
 
-def pot_simple_cosine(theta, theta0, k):
-    """"
-    Extremely simplified cosine potential for torsions
-    """
-
-    u = k * (1 + np.cos(math.radians(180) + theta - theta0))
-
-    return u
 
 ##############################################################################
 # Classes for Force Field Terms defined below
@@ -259,6 +266,8 @@ class FFBend:
     def energy(self, a, dist1, dist2, alternative_k=None):
         """ Returns the energy of this bending potential at angle a"""
 
+        # print("a0 = {: .3f}, a = {: .3f}".format(math.degrees(self.a0),
+        #                                        math.degrees(a)))
         energy = 0.0
         if self.kind == 1:
             # Simple harmonic potential
@@ -273,15 +282,12 @@ class FFBend:
             f_dmp = f_dmp_12 * f_dmp_23
             # Distance dependent damped harmonic potential
 
-            # print("bending potential a0 = {}, a = {}".format(self.a0,a))
-            # print("bending potential a0 = {}, a = {}".format(math.degrees(self.a0), math.degrees(a)))
             if alternative_k is None:
                 energy = pot_bend(a, self.a0, self.k_bend, f_dmp)
             else:
                 energy = pot_bend(a, self.a0, alternative_k, f_dmp)
-                # print("Energy contrib e = {}\n".format(energy))
-        # if energy < 0.0:
-        #     energy = 0.0
+        # if energy >= 1E-11:
+        #     print("Angle bending energy {: .3E}".format(energy))
         return energy
 
 
@@ -355,13 +361,14 @@ class FFTorsion:
     def energy(self, theta, dist1, dist2, dist3, alternative_k=None):
         """ Returns the energy of this torsion potential at angle theta"""
 
-        # print("theta0 = {}, theta = {}".format(math.degrees(self.theta0), math.degrees(theta)))
+        # print("theta0 = {: .3f}, theta = {: .3f}".format(
+        #     math.degrees(self.theta0), math.degrees(theta)))
         energy = 0.0
         if self.kind == 1:
             if alternative_k is None:
-                energy = pot_simple_cosine(theta, self.theta0, self.k_tors)
+                energy = pot_harmonic(theta, self.theta0, self.k_tors)
             else:
-                energy = pot_simple_cosine(theta, self.theta0, alternative_k)
+                energy = pot_harmonic(theta, self.theta0, alternative_k)
         elif self.kind == 2:
             # Calculate distance dependent damping f_dmp
             f_dmp_12 = damping_function(self.symbol1, self.symbol2, dist1)
@@ -371,11 +378,11 @@ class FFTorsion:
             # Distance dependent damped harmonic potential
 
             if alternative_k is None:
-                energy = pot_bend(a, self.theta0, self.k_tors, f_dmp)
+                energy = dihedral_pot_bend(theta, self.theta0, self.k_tors, f_dmp)
             else:
-                energy = pot_bend(a, self.theta0, alternative_k, f_dmp)
-        if energy >= 1E-1:
-            print("Torsional energy: {}".format(energy))
+                energy = dihedral_pot_bend(theta, self.theta0, alternative_k, f_dmp)
+        # if energy >= 1E-11:
+        #     print("Torsional energy: {: .3E}".format(energy))
         return energy
 
 class ForceField:
@@ -459,7 +466,7 @@ class ForceField:
                 # c[3 * bond[1] + 2] = c2[2]
                 # c = c / np.linalg.norm(c)
                 # fc = np.dot(np.dot(c, self.qm_hessian), np.transpose(c))
-                fc = 0.2
+                fc = 0.5
 
                 if verbosity >= 3:
                     print(" {:<3} ({:3d}) and {:<3} ({:3d}) (Force constant:"
@@ -509,7 +516,7 @@ class ForceField:
                 #     fc = np.dot(np.dot(c, self.qm_hessian), np.transpose(c))
                 # else:
                 #     fc = 0.0
-                fc = 0.2
+                fc = 0.5
                 if verbosity >= 3:
                     print(
                         " {:<3} ({:3d}), {:<3} ({:3d}) and {:<3} ({:3d})"
@@ -541,7 +548,7 @@ class ForceField:
                 if (math.pi - 0.2) >= molecule.atm_atm_atm_angle(angle[0],
                                                                  angle[1],
                                                                  angle[2]):
-                    fc = 0.2
+                    fc = 0.5
                     if verbosity >= 3:
                         print(
                             " {:<3} ({:3d}) and {:<3} ({:3d}) (Force constant:"
@@ -565,7 +572,10 @@ class ForceField:
                     "\nAdding Force Field torsional terms to WellFARe molecule: ",
                     molecule.name)
             for dihedral in molecule.dihedrals:
-                fc = 0.2
+                fc = 0.5
+                angle = molecule.atm_atm_atm_atm_dihedral(
+                                            dihedral[0], dihedral[1],
+                                            dihedral[2], dihedral[3])
                 new_torsion = FFTorsion(dihedral[0],
                                         molecule.atoms[dihedral[0]].symbol(),
                                         dihedral[1],
@@ -574,9 +584,7 @@ class ForceField:
                                         molecule.atoms[dihedral[2]].symbol(),
                                         dihedral[3],
                                         molecule.atoms[dihedral[3]].symbol(),
-                                        theta0=molecule.atm_atm_atm_atm_dihedral(
-                                            dihedral[0], dihedral[1],
-                                            dihedral[2], dihedral[3]), kind=1,
+                                        theta0=angle, kind=2,
                                         arg=[fc])
                 self.add_torsion(new_torsion)
 
@@ -660,6 +668,7 @@ class ForceField:
             torsion.k_tors = new_coefficients[idx + offset]
 
     def ff_gradient(self, coordinates=None, coefficients=None):
+        # epsilon = 1E-4
         epsilon = 1E-5
         # The force-field gradient with respect to coordinates
         if coordinates is None:
@@ -671,6 +680,7 @@ class ForceField:
                                             epsilon, coefficients)
 
     def ff_hessian(self, coefficients=None, coordinates=None):
+        # epsilon = 1E-4
         epsilon = 1E-5
         # The force-field hessian with respect to coordinates
         if coordinates is None:
@@ -781,12 +791,14 @@ class ForceField:
             # else:
             #     print("Some other bending potential")
             # print("Bend contribution: {}".format(bend.energy(theta)))
-            bend_energy += bend.energy(theta, d_bond_1, d_bond_2,
+            this_bend_energy = bend.energy(theta, d_bond_1, d_bond_2,
                                   alternative_k=coefficients[idx + offset])
-        if verbosity >= 3:
-            print("Total bend energy: {: .5f}".format(bend_energy))
+            bend_energy += this_bend_energy
 
-        offset += len(self.torsions)
+        if verbosity >= 3:
+            print("Total bend energy: {: 7.3E}".format(bend_energy))
+
+        offset += len(self.bends)
         for idx, torsion in enumerate(self.torsions):
             atom1_x_coord = coordinates[torsion.atom1 * 3]
             atom1_y_coord = coordinates[torsion.atom1 * 3 + 1]
@@ -807,21 +819,21 @@ class ForceField:
             z_coord_e1 = (atom1_z_coord - atom2_z_coord)
             end_1 = [x_coord_e1, y_coord_e1, z_coord_e1]
             d_bond_1 = math.sqrt(
-                x_coord_e1 ** 2 + y_coord_e1 ** 2 + z_coord_e1 ** 2)
+                (x_coord_e1 ** 2) + (y_coord_e1 ** 2) + (z_coord_e1 ** 2))
 
             x_coord_b = (atom2_x_coord - atom3_x_coord)
             y_coord_b = (atom2_y_coord - atom3_y_coord)
             z_coord_b = (atom2_z_coord - atom3_z_coord)
             bridge = [x_coord_b, y_coord_b, z_coord_b]
             d_bond_2 = math.sqrt(
-                x_coord_b ** 2 + y_coord_b ** 2 + z_coord_b ** 2)
+                (x_coord_b ** 2) + (y_coord_b ** 2) + (z_coord_b ** 2))
 
             x_coord_e2 = (atom3_x_coord - atom4_x_coord)
             y_coord_e2 = (atom3_y_coord - atom4_y_coord)
             z_coord_e2 = (atom3_z_coord - atom4_z_coord)
             end_2 = [x_coord_e2, y_coord_e2, z_coord_e2]
             d_bond_3 = math.sqrt(
-                x_coord_e2 ** 2 + y_coord_e2 ** 2 + z_coord_e2 ** 2)
+                (x_coord_e2 ** 2) + (y_coord_e2 ** 2) + (z_coord_e2 ** 2))
 
             vnormal_1 = np.cross(end_1, bridge)
             vnormal_2 = np.cross(bridge, end_2)
@@ -846,9 +858,12 @@ class ForceField:
                                                d_bond_3,
                                                alternative_k=coefficients[
                                                    idx + offset])
+            # print(
+            #     "psi {: 0.5f} ({: 0.5f}), d1 {: 0.5f}, d2 {: 0.5f}, d3"
+            #     " {: 0.5f}, k {: 0.5f}, E {: 7.3E}".format(psi, math.degrees(psi), d_bond_1,d_bond_2,d_bond_3,coefficients[idx + offset],torsional_energy))
 
         if verbosity >= 3:
-            print("Total torsional energy: {: .5f}".format(torsional_energy))
+            print("Total torsional energy: {: 7.3E}".format(torsional_energy))
 
         if verbosity >= 3:
             print("Total FF energy: {: .5f}".format(
@@ -876,71 +891,75 @@ class ForceField:
 
         return difference
 
-    def ff_optimise_coefficients(self, verbosity=0):
+    def ff_optimise_coefficients(self, starttime=None, verbosity=0):
         if verbosity >= 2:
             print("\nOptimising coefficients by fitting to the QM Hessian.")
-
-        if verbosity >= 3:
-            print("\nInitial coefficients:")
-            coeff_string = "Stretches:\n"
-            str_coeff_string = ""
-            for stretch in self.stretches:
-                str_coeff_string += " {: .4f}".format(stretch.k_str)
-                if len(str_coeff_string) >= 70:
-                    str_coeff_string += "\n"
-                    coeff_string += str_coeff_string
-                    str_coeff_string = ""
-            coeff_string += str_coeff_string
-            b_coeff_string = ""
-            if len(self.bends) != 0:
-                coeff_string += "\nBends:\n"
-            for bend in self.bends:
-                b_coeff_string += " {: .4f}".format(bend.k_bend)
-                if len(b_coeff_string) >= 70:
-                    b_coeff_string += "\n"
-                    coeff_string += b_coeff_string
-                    b_coeff_string = ""
-            coeff_string += b_coeff_string
-            t_coeff_string = ""
-            if len(self.torsions) != 0:
-                t_coeff_string += "\nTorsions:\n"
-            for bend in self.torsions:
-                t_coeff_string += " {: .4f}".format(bend.k_tors)
-                if len(t_coeff_string) >= 70:
-                    t_coeff_string += "\n"
-                    coeff_string += t_coeff_string
-                    t_coeff_string = ""
-            coeff_string += t_coeff_string
-            print(coeff_string)
-
         # Optimise until we find a set of coefficients that has no
         # linear dependencies
         while True:
+            if verbosity >= 3:
+                print("\nInitial coefficients:")
+                coeff_string = "{} Stretches:\n".format(len(self.stretches))
+                str_coeff_string = ""
+                for stretch in self.stretches:
+                    str_coeff_string += " {: .4f}".format(stretch.k_str)
+                    if len(str_coeff_string) >= 70:
+                        str_coeff_string += "\n"
+                        coeff_string += str_coeff_string
+                        str_coeff_string = ""
+                coeff_string += str_coeff_string
+                b_coeff_string = ""
+                if len(self.bends) != 0:
+                    coeff_string += "\n{} Bends:\n".format(len(self.bends))
+                for bend in self.bends:
+                    b_coeff_string += " {: .4f}".format(bend.k_bend)
+                    if len(b_coeff_string) >= 70:
+                        b_coeff_string += "\n"
+                        coeff_string += b_coeff_string
+                        b_coeff_string = ""
+                coeff_string += b_coeff_string
+                t_coeff_string = ""
+                if len(self.torsions) != 0:
+                    coeff_string += "\n{} Torsions:\n".format(len(self.torsions))
+                for bend in self.torsions:
+                    t_coeff_string += " {: .4f}".format(bend.k_tors)
+                    if len(t_coeff_string) >= 70:
+                        t_coeff_string += "\n"
+                        coeff_string += t_coeff_string
+                        t_coeff_string = ""
+                coeff_string += t_coeff_string
+                print(coeff_string)
+
             # Store coefficients in separate array for optimisation
             coeff_to_opt = np.array(self.ff_coefficients())
-            # Try L-BFGS-B algorithm first
+            # Store boundary condition in a list
+            boundaries = [(0,np.Infinity)] * len(coeff_to_opt)
+            # Try SLSQP algorithm first
             opt_coeff = scipy.optimize.minimize(
-                self.ff_diff_qm_ff_hessian, coeff_to_opt,
-                method="L-BFGS-B", options={'eps': 0.01})
+                self.ff_diff_qm_ff_hessian, coeff_to_opt, bounds = boundaries,
+                method = "SLSQP", options = {'eps': 0.001})
+            print(msg_timestamp("Optimisation finished.", starttime=starttime))
             if opt_coeff.success:
                 if verbosity >= 2:
-                    print("\nFirst optimisation attempt (L-BFGS) converged!")
+                    print("\nFirst optimisation attempt (SLSQP) converged!")
                     if verbosity >= 3:
                         print(" in {} iterations".format(opt_coeff.nit))
                         print(" Δ(H_QM,H_FF) = {: .4f}".format(opt_coeff.fun))
             else:
                 if verbosity >= 2:
-                    print("\nFirst optimisation attempt (L-BFGS) failed")
+                    print("\nFirst optimisation attempt (SLSQP) failed")
                     print(" number of iterations {}".format(opt_coeff.nit))
                     print(" Δ(H_QM,H_FF) = {: .4f}".format(opt_coeff.fun))
-                    print(" trying again...")
-                # In case of failure, try the SLSQP algorithm next
+                    print(" need to try again...")
+                # In case of failure, try the L-BFGS-B algorithm next
                 opt_coeff = scipy.optimize.minimize(
                     self.ff_diff_qm_ff_hessian, opt_coeff.x,
-                    method="SLSQP", options={'eps': 0.01})
+                    method="L-BFGS-B", bounds=boundaries,
+                    options={'eps': 0.01})
+                print(msg_timestamp("Optimisation finished.", starttime=starttime))
                 if opt_coeff.success:
                     if verbosity >= 2:
-                        print("\nSecond optimisation attempt (SLSQP) converged!")
+                        print("\nSecond optimisation attempt (L-BFGS) converged!")
                         if verbosity >= 3:
                             print(" in {} iterations".format(opt_coeff.nit))
                             print(" Δ(H_QM,H_FF) = {: .4f}".format(
@@ -948,45 +967,65 @@ class ForceField:
                 else:
                     if verbosity >= 2:
                         print(
-                            "\nSecond optimisation attempt (SLSQP) also failed")
+                            "\nSecond optimisation attempt (L-BFGS) also failed")
                         print(" number of iterations {}".format(opt_coeff.nit))
                         print(" Δ(H_QM,H_FF) = {: .4f}".format(opt_coeff.fun))
-                        print(
-                            " still going to use those coefficients though...")
+                        print(" we're still going to use those"
+                              " coefficients though...")
 
             # Checking for negative coefficients (i.e. linear dependencies)
             has_linear_dependency = False
+            bend_offset = len(self.stretches)
+            torsion_offset = len(self.stretches) + len(self.bends)
+            delete_stretches = []
+            delete_bends = []
+            delete_torsions = []
             for idx, stretch in enumerate(self.stretches):
                 if opt_coeff.x[idx] <= 0.0:
-                    print(" stretching coefficient {} is negative"
-                          " ({: .4f})".format(idx, opt_coeff.x[idx]))
+                    if verbosity >= 3:
+                        print(" stretching coefficient {} is negative"
+                              " ({: .4f})".format(idx + 1, opt_coeff.x[idx]))
                     has_linear_dependency = True
+                    delete_stretches.append(idx)
+            if len(delete_stretches) > 0:
+                for idx in reversed(delete_stretches):
                     del self.stretches[idx]
-            offset = len(self.stretches)
-            for idx, stretch in enumerate(self.bends):
-                if opt_coeff.x[offset + idx] <= 0.0:
-                    print(" bending coefficient {} is negative"
-                          " ({: .4f})".format(idx, opt_coeff.x[offset + idx]))
+            for idx, bend in enumerate(self.bends):
+                if opt_coeff.x[bend_offset + idx] <= 0.0:
+                    if verbosity >= 3:
+                        print(
+                            " bending coefficient {} is negative"
+                            " ({: .4f})".format(idx + 1, opt_coeff.x[
+                                bend_offset + idx]))
                     has_linear_dependency = True
-                    del self.bends[offset + idx]
-            offset += len(self.torsions)
+                    delete_bends.append(idx)
+            if len(delete_bends) > 0:
+                for idx in reversed(delete_bends):
+                    del self.bends[idx]
             for idx, torsion in enumerate(self.torsions):
-                if opt_coeff.x[offset + idx] <= 0.0:
-                    print(" torsion coefficient {} is negative"
-                          " ({: .4f})".format(idx, opt_coeff.x[offset + idx]))
+                if opt_coeff.x[torsion_offset + idx] <= 0.0:
+                    if verbosity >= 3:
+                        print(
+                            " torsion coefficient {} is negative"
+                            " ({: .4f})".format(idx + 1, opt_coeff.x[
+                                torsion_offset + idx]))
                     has_linear_dependency = True
-                    del self.torsions[offset + idx]
+                    delete_torsions.append(idx)
+            if len(delete_torsions) > 0:
+                for idx in reversed(delete_torsions):
+                    del self.torsions[idx]
             if has_linear_dependency:
                 opt_coeff = [item for item in opt_coeff.x if item > 0.0]
                 self.ff_set_coefficients(opt_coeff)
-                print(" deleting linear dependencies and re-optimising")
+                if verbosity >= 2:
+                    print(" deleting linear dependencies and re-optimising")
             else:
                 self.ff_set_coefficients(opt_coeff.x)
                 break
 
         if verbosity >= 3:
             print("\nSetting FF to these final coefficients:")
-            coeff_string = "Stretches:\n"
+            coeff_string = "{} Stretches:\n".format(len(self.stretches))
             str_coeff_string = ""
             for stretch in self.stretches:
                 str_coeff_string += " {: .4f}".format(stretch.k_str)
@@ -997,7 +1036,7 @@ class ForceField:
             coeff_string += str_coeff_string
             b_coeff_string = ""
             if len(self.bends) != 0:
-                coeff_string += "\nBends:\n"
+                coeff_string += "\n{} Bends:\n".format(len(self.bends))
             for bend in self.bends:
                 b_coeff_string += " {: .4f}".format(bend.k_bend)
                 if len(b_coeff_string) >= 70:
@@ -1007,7 +1046,7 @@ class ForceField:
             coeff_string += b_coeff_string
             t_coeff_string = ""
             if len(self.torsions) != 0:
-                t_coeff_string += "\nTorsions:\n"
+                coeff_string += "\n{} Torsions:\n".format(len(self.torsions))
             for bend in self.torsions:
                 t_coeff_string += " {: .4f}".format(bend.k_tors)
                 if len(t_coeff_string) >= 70:

@@ -75,8 +75,8 @@ def main(main_start_time):
     print("\nInitial geometry")
     print(molecule.print_mol(output="internals"))
 
-    molecular_force_field.ff_optimise_coefficients(verbosity=3)
-
+    molecular_force_field.ff_optimise_coefficients(starttime=main_start_time,
+                                                   verbosity=3)
     # molecular_force_field.ff_optimise_geometry(verbosity=3)
 
     # from wellfare.thermochemistry import thermochemical_analysis
