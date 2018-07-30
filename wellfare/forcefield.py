@@ -389,8 +389,10 @@ class ForceField:
     """A force-field for a given molecule"""
 
     def __init__(self, molecule, parametrize_bond_stretches=False,
-                 parametrize_angle_bends=False, parametrize_distance_matrix=False,
-                 parametrize_torsions=False,
+                 parametrize_angle_bends=False,
+                 parametrize_distance_matrix=False,
+                 parametrize_torsions=False, optimize_parameters=False,
+                 main_start_time=None,
                  verbosity=0):
         """ (Molecule, str, int) -> NoneType
 
@@ -586,7 +588,23 @@ class ForceField:
                                         molecule.atoms[dihedral[3]].symbol(),
                                         theta0=angle, kind=2,
                                         arg=[fc])
+                if verbosity >= 3:
+                    print(
+                        " {:<3} ({:3d}), {:<3} ({:3d}), {:<3} ({:3d}) and"
+                        " {:<3} ({:3d}) (Force constant: {: .3f})".format(
+                            molecule.atoms[dihedral[0]].symbol(),
+                            dihedral[0] + 1,
+                            molecule.atoms[dihedral[1]].symbol(),
+                            dihedral[1] + 1,
+                            molecule.atoms[dihedral[2]].symbol(),
+                            dihedral[2] + 1,
+                            molecule.atoms[dihedral[3]].symbol(),
+                            dihedral[3] + 1, fc))
                 self.add_torsion(new_torsion)
+        if optimize_parameters is True:
+            self.ff_optimise_coefficients(
+                starttime=main_start_time,
+                verbosity=3)
 
     def __str__(self):
         """ (Molecule) -> str
@@ -668,7 +686,6 @@ class ForceField:
             torsion.k_tors = new_coefficients[idx + offset]
 
     def ff_gradient(self, coordinates=None, coefficients=None):
-        # epsilon = 1E-4
         epsilon = 1E-5
         # The force-field gradient with respect to coordinates
         if coordinates is None:
@@ -680,7 +697,6 @@ class ForceField:
                                             epsilon, coefficients)
 
     def ff_hessian(self, coefficients=None, coordinates=None):
-        # epsilon = 1E-4
         epsilon = 1E-5
         # The force-field hessian with respect to coordinates
         if coordinates is None:
@@ -937,8 +953,8 @@ class ForceField:
             # Try SLSQP algorithm first
             opt_coeff = scipy.optimize.minimize(
                 self.ff_diff_qm_ff_hessian, coeff_to_opt, bounds = boundaries,
-                method = "SLSQP", options = {'eps': 0.001})
-            print(msg_timestamp("Optimisation finished.", starttime=starttime))
+                method = "SLSQP", options = {'eps': 1E-3})
+            print(msg_timestamp("\nOptimisation finished.", starttime=starttime))
             if opt_coeff.success:
                 if verbosity >= 2:
                     print("\nFirst optimisation attempt (SLSQP) converged!")
@@ -955,8 +971,8 @@ class ForceField:
                 opt_coeff = scipy.optimize.minimize(
                     self.ff_diff_qm_ff_hessian, opt_coeff.x,
                     method="L-BFGS-B", bounds=boundaries,
-                    options={'eps': 0.01})
-                print(msg_timestamp("Optimisation finished.", starttime=starttime))
+                    options={'eps': 1E-2})
+                print(msg_timestamp("\nOptimisation finished.", starttime=starttime))
                 if opt_coeff.success:
                     if verbosity >= 2:
                         print("\nSecond optimisation attempt (L-BFGS) converged!")

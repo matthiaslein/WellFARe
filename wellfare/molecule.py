@@ -932,7 +932,7 @@ def batch_compare_distances(molecule, chunk_start, chunk_end, tolerance,
     return results
 
 
-def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.45,
+def build_bond_orders(molecule, bo=None, verbosity=0, bondcutoff=0.40,
                       distfactor=1.3, deletefirst=True, canonical_order=False,
                       cpu_number=1):
     """

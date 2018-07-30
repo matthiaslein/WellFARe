@@ -70,19 +70,19 @@ def main(main_start_time):
                                        parametrize_bond_stretches=True,
                                        parametrize_angle_bends=True,
                                        parametrize_torsions=True,
+                                       optimize_parameters=True,
+                                       main_start_time=main_start_time,
                                        verbosity=args.verbosity)
 
     print("\nInitial geometry")
     print(molecule.print_mol(output="internals"))
 
-    molecular_force_field.ff_optimise_coefficients(starttime=main_start_time,
-                                                   verbosity=3)
     # molecular_force_field.ff_optimise_geometry(verbosity=3)
 
-    # from wellfare.thermochemistry import thermochemical_analysis
-    # thermochemical_analysis(molecule,
-    #                         hessian=molecular_force_field.ff_hessian(),
-    #                         verbosity=3)
+    from wellfare.thermochemistry import thermochemical_analysis
+    thermochemical_analysis(molecule,
+                            hessian=molecular_force_field.ff_hessian(),
+                            verbosity=3)
 
     # Print program footer
     if args.verbosity >= 1:
